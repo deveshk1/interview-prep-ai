@@ -138,42 +138,61 @@ function ResultsPanel({ guide, company, role, experience, onReset }) {
             <section className="doc-section">
               <span className="section-eyebrow">Technical Inventory</span>
               <h2 className="doc-title">Premium Question Bank</h2>
-              <p className="doc-lead">Mined from real-world patterns for {role}. Click to reveal deep insights.</p>
+              <p className="doc-lead">Mined from real-world patterns for {role}. Grouped by core evaluation pillars.</p>
               
-              <div className="questions-list">
-                {(data.topQuestions || []).map((q, i) => (
-                  <div 
-                    key={i} 
-                    className={`q-row ${expandedQuestion === i ? "is-expanded" : ""}`}
-                    onClick={() => setExpandedQuestion(expandedQuestion === i ? null : i)}
-                  >
-                    <div className="q-row-main">
-                      <div className="q-row-id">Q{i + 1}</div>
-                      <div className="q-row-text">{q.question}</div>
-                      <div className="q-row-meta">
-                        <span className="q-category-pill">{q.category}</span>
-                      </div>
-                      <div className="q-toggle-icon">{expandedQuestion === i ? "−" : "+"}</div>
-                    </div>
+              <div className="topic-wise-questions">
+                {Object.entries(
+                  (data.topQuestions || []).reduce((acc, q) => {
+                    const cat = q.category || "General";
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(q);
+                    return acc;
+                  }, {})
+                ).map(([category, questions], groupIdx) => (
+                  <div key={groupIdx} className="q-topic-group">
+                    <h3 className="q-topic-header">
+                      <span className="q-topic-dot" />
+                      {category}
+                      <span className="q-topic-count">{questions.length} Questions</span>
+                    </h3>
                     
-                    {expandedQuestion === i && (
-                      <div className="q-row-expanded fade-in">
-                        <div className="q-coach-insight">
-                          <div className="insight-row">
-                            <span className="insight-label">SIGNAL:</span>
-                            <span className="insight-value">{q.whyAsk}</span>
-                          </div>
-                          <div className="insight-row">
-                            <span className="insight-label">KEY CONCEPTS:</span>
-                            <div className="key-concepts">
-                              {(q.keyPoints || []).map((kp, j) => (
-                                <span key={j} className="concept-pill">{kp}</span>
-                              ))}
+                    <div className="questions-list">
+                      {questions.map((q, i) => {
+                        const globalIdx = (data.topQuestions || []).indexOf(q);
+                        return (
+                          <div 
+                            key={globalIdx} 
+                            className={`q-row ${expandedQuestion === globalIdx ? "is-expanded" : ""}`}
+                            onClick={() => setExpandedQuestion(expandedQuestion === globalIdx ? null : globalIdx)}
+                          >
+                            <div className="q-row-main">
+                              <div className="q-row-id">Q{globalIdx + 1}</div>
+                              <div className="q-row-text">{q.question}</div>
+                              <div className="q-toggle-icon">{expandedQuestion === globalIdx ? "−" : "+"}</div>
                             </div>
+                            
+                            {expandedQuestion === globalIdx && (
+                              <div className="q-row-expanded fade-in">
+                                <div className="q-coach-insight">
+                                  <div className="insight-row">
+                                    <span className="insight-label">SIGNAL:</span>
+                                    <span className="insight-value">{q.whyAsk}</span>
+                                  </div>
+                                  <div className="insight-row">
+                                    <span className="insight-label">KEY CONCEPTS:</span>
+                                    <div className="key-concepts">
+                                      {(q.keyPoints || []).map((kp, j) => (
+                                        <span key={j} className="concept-pill">{kp}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </div>
-                    )}
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -395,8 +414,8 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 
 .sidebar-footer { border-top: 1px solid #eeeeee; padding-top: 32px; }
 .sidebar-footer p { font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-bottom: 12px; }
-.new-btn { width: 100%; padding: 10px; border: 1px solid #000; background: #fff; font-family: inherit; font-weight: 800; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.2s; }
-.new-btn:hover { background: #000; color: #fff; }
+.new-btn { width: 100%; padding: 10px; border: none; background: #000; color: #fff; font-family: inherit; font-weight: 800; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.2s; }
+.new-btn:hover { background: #333; }
 
 /* ── CONTENT AREA ── */
 .content-area { flex: 1; overflow-y: auto; background: #fff; }
@@ -450,7 +469,18 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 .task-text { font-size: 14px; font-weight: 600; color: #374151; line-height: 1.5; }
 
 /* QUESTIONS */
-.questions-list { display: flex; flex-direction: column; border-top: 1px solid #eeeeee; width: 100%; }
+.topic-wise-questions { width: 100%; display: flex; flex-direction: column; gap: 48px; }
+.q-topic-group { width: 100%; }
+.q-topic-header { 
+  display: flex; align-items: center; gap: 12px; 
+  font-size: 16px; font-weight: 800; color: #000; 
+  margin-bottom: 16px; padding-bottom: 12px; 
+  border-bottom: 2px solid #000; 
+}
+.q-topic-dot { width: 6px; height: 6px; background: #2563eb; border-radius: 50%; }
+.q-topic-count { margin-left: auto; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #9ca3af; letter-spacing: 0.05em; }
+
+.questions-list { display: flex; flex-direction: column; width: 100%; }
 .q-row { border-bottom: 1px solid #eeeeee; transition: background 0.1s; }
 .q-row:hover { background: #f9fafb; }
 .q-row.is-expanded { background: #fff; border-left: 4px solid #000; }
