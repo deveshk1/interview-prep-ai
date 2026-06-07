@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Container,
   Paper,
@@ -11,6 +11,8 @@ import {
 import ReactMarkdown from "react-markdown";
 
 import { generateInterviewGuide } from "./services/interviewService";
+import Login from "./components/Login";
+import { supabase } from "./lib/supabase";
 
 function App() {
   const [company, setCompany] = useState("");
@@ -20,32 +22,78 @@ function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-const generateGuide = async () => {
-  setLoading(true);
+  const [session, setSession] = useState(undefined);
 
-  try {
-    const guide =
-      await generateInterviewGuide(
-        company,
-        role,
-        experience
-      );
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+      });
 
-    setResult(guide);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_, session) => {
+        setSession(session);
+      }
+    );
 
-  } catch (err) {
-    console.error(err);
-    setResult("Error generating guide");
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const generateGuide = async () => {
+    setLoading(true);
+
+    try {
+      const guide =
+        await generateInterviewGuide(
+          company,
+          role,
+          experience
+        );
+
+      setResult(guide);
+
+    } catch (err) {
+      console.error(err);
+      setResult("Error generating guide");
+    }
+
+    setLoading(false);
+  };
+
+  if (session === undefined) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center"
+        }}
+      >
+        <Typography>Loading...</Typography>
+      </Box>
+    );
   }
 
-  setLoading(false);
-};
+  if (!session) {
+    return <Login />;
+  }
 
   return (
     <Container maxWidth="md" sx={{ mt: 5 }}>
       <Paper elevation={4} sx={{ p: 4 }}>
         <Typography variant="h4" gutterBottom>
           AI Interview Preparation Guide
+        </Typography>
+
+        <Typography
+          variant="body2"
+          sx={{ mb: 2 }}
+        >
+          Logged in as {session.user.email}
         </Typography>
 
         <Typography
@@ -94,15 +142,12 @@ const generateGuide = async () => {
             variant="contained"
             size="large"
             onClick={generateGuide}
+            disabled={loading}
           >
-            Generate Guide
+            {loading
+              ? "Generating..."
+              : "Generate Guide"}
           </Button>
-
-          {loading && (
-            <Typography sx={{ mt: 3 }}>
-              Generating guide...
-            </Typography>
-          )}
 
           {result && (
             <Paper
