@@ -16,9 +16,10 @@ function parseGuide(raw) {
 }
 
 /* ─── Results Panel (Sidebar + Minimalist Briefing) ─── */
-function ResultsPanel({ guide, company, role, experience }) {
+function ResultsPanel({ guide, company, role, experience, onReset }) {
   const data = parseGuide(guide);
   const [activeTab, setActiveTab] = useState("overview");
+  const [expandedQuestion, setExpandedQuestion] = useState(null);
 
   if (!data || !data.difficultyScore) {
     return (
@@ -62,7 +63,7 @@ function ResultsPanel({ guide, company, role, experience }) {
 
         <div className="sidebar-footer">
           <p>Verified for {experience}YR Exp.</p>
-          <button className="new-btn" onClick={() => window.location.reload()}>New Guide</button>
+          <button className="new-btn" onClick={onReset}>New Guide</button>
         </div>
       </aside>
 
@@ -92,9 +93,13 @@ function ResultsPanel({ guide, company, role, experience }) {
               <div className="spacer-lg" />
 
               <h3 className="sub-title">Target Topics</h3>
-              <div className="topic-flow">
+              <div className="topic-grid">
                 {(data.topTopics || []).map((t, i) => (
-                  <span key={i} className="topic-label">{t}</span>
+                  <div key={i} className="topic-cell">
+                    <span className="cell-idx">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="cell-name">{t}</span>
+                    <span className="cell-status"><span className="status-indicator" /> High Signal</span>
+                  </div>
                 ))}
               </div>
             </section>
@@ -104,17 +109,25 @@ function ResultsPanel({ guide, company, role, experience }) {
             <section className="doc-section">
               <span className="section-eyebrow">Tactical Timeline</span>
               <h2 className="doc-title">14-Day Preparation</h2>
-              <div className="roadmap-flow">
+              
+              <div className="roadmap-stream">
                 {(data.preparationPlan || []).map((week, i) => (
-                  <div key={i} className="roadmap-week">
-                    <h3 className="week-heading">Week {week.week} · <span>{week.focus}</span></h3>
-                    <ul className="check-list">
-                      {(week.tasks || []).map((task, j) => (
-                        <li key={j} className="check-item">
-                          <span className="box" /> {task}
-                        </li>
-                      ))}
-                    </ul>
+                  <div key={i} className="week-block">
+                    <div className="week-marker">
+                      <div className="marker-line" />
+                      <div className="marker-circle">W{week.week}</div>
+                    </div>
+                    <div className="week-content">
+                      <h3 className="week-title">{week.focus}</h3>
+                      <div className="task-stack">
+                        {(week.tasks || []).map((task, j) => (
+                          <div key={j} className="task-card">
+                            <div className="task-dot" />
+                            <div className="task-text">{task}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -124,15 +137,43 @@ function ResultsPanel({ guide, company, role, experience }) {
           {activeTab === "questions" && (
             <section className="doc-section">
               <span className="section-eyebrow">Technical Inventory</span>
-              <h2 className="doc-title">Top 20 Questions</h2>
-              <div className="questions-spacious">
+              <h2 className="doc-title">Premium Question Bank</h2>
+              <p className="doc-lead">Mined from real-world patterns for {role}. Click to reveal deep insights.</p>
+              
+              <div className="questions-list">
                 {(data.topQuestions || []).map((q, i) => (
-                  <div key={i} className="q-row">
-                    <div className="q-meta">
-                      <span className="q-idx">{i + 1}</span>
-                      <span className="q-tag">{q.category}</span>
+                  <div 
+                    key={i} 
+                    className={`q-row ${expandedQuestion === i ? "is-expanded" : ""}`}
+                    onClick={() => setExpandedQuestion(expandedQuestion === i ? null : i)}
+                  >
+                    <div className="q-row-main">
+                      <div className="q-row-id">Q{i + 1}</div>
+                      <div className="q-row-text">{q.question}</div>
+                      <div className="q-row-meta">
+                        <span className="q-category-pill">{q.category}</span>
+                      </div>
+                      <div className="q-toggle-icon">{expandedQuestion === i ? "−" : "+"}</div>
                     </div>
-                    <p className="q-text">{q.question}</p>
+                    
+                    {expandedQuestion === i && (
+                      <div className="q-row-expanded fade-in">
+                        <div className="q-coach-insight">
+                          <div className="insight-row">
+                            <span className="insight-label">SIGNAL:</span>
+                            <span className="insight-value">{q.whyAsk}</span>
+                          </div>
+                          <div className="insight-row">
+                            <span className="insight-label">KEY CONCEPTS:</span>
+                            <div className="key-concepts">
+                              {(q.keyPoints || []).map((kp, j) => (
+                                <span key={j} className="concept-pill">{kp}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -146,9 +187,11 @@ function ResultsPanel({ guide, company, role, experience }) {
               <div className="process-list">
                 {(data.interviewRounds || []).map((r, i) => (
                   <div key={i} className="process-node">
-                    <h4 className="node-name">{r.name}</h4>
+                    <div className="node-meta">
+                      <h4 className="node-name">{r.name}</h4>
+                      {r.duration && <span className="node-time">{r.duration}</span>}
+                    </div>
                     <p className="node-desc">{r.description}</p>
-                    {r.duration && <span className="node-time">{r.duration}</span>}
                   </div>
                 ))}
               </div>
@@ -161,9 +204,9 @@ function ResultsPanel({ guide, company, role, experience }) {
               <h2 className="doc-title">Executive Briefing</h2>
               <div className="brief-grid">
                 {(data.strategicBriefing || []).map((brief, i) => (
-                  <div key={i} className={`brief-chunk ${brief.type}`}>
-                    <h4 className="chunk-title">{brief.title}</h4>
-                    <ul className="chunk-points">
+                  <div key={i} className={`brief-mod ${brief.type}`}>
+                    <h4 className="mod-title">{brief.title}</h4>
+                    <ul className="mod-points">
                       {(brief.points || []).map((p, j) => (
                         <li key={j}>{p}</li>
                       ))}
@@ -216,6 +259,13 @@ export default function App() {
     setLoading(false);
   };
 
+  const reset = () => {
+    setGuide(null);
+    setCompany("");
+    setRole("");
+    setExperience("");
+  };
+
   if (session === undefined) return <div className="loader">Checking Credentials...</div>;
   if (!session) return <Login />;
 
@@ -261,7 +311,7 @@ export default function App() {
             <p>Processing data models{".".repeat(dots)}</p>
           </div>
         ) : (
-          <ResultsPanel guide={guide} company={company} role={role} experience={experience} />
+          <ResultsPanel guide={guide} company={company} role={role} experience={experience} onReset={reset} />
         )}
       </div>
     </>
@@ -274,134 +324,197 @@ export default function App() {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-:root {
-  --bg: #ffffff;
-  --text: #000000;
-  --text-muted: #6b7280;
-  --text-dim: #9ca3af;
-  --accent: #2563eb;
-  --border: #f3f4f6;
-  --surf: #fafafa;
-  --sans: 'Plus Jakarta Sans', sans-serif;
-}
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app { min-height: 100vh; display: flex; flex-direction: column; width: 100%; align-items: stretch; }
 
 /* ── LANDING ── */
-.landing { max-width: 1200px; margin: 0 auto; width: 100%; padding: 0 40px; }
-.navbar { height: 80px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 120px; }
+.landing { max-width: 1200px; margin: 0 auto; width: 100%; padding: 0 40px; display: flex; flex-direction: column; align-items: center; }
+.navbar { height: 80px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 120px; width: 100%; }
 .brand { font-weight: 800; font-size: 20px; letter-spacing: -0.04em; }
-.brand span { color: var(--accent); }
-.user-area { font-size: 13px; font-weight: 600; color: var(--text-dim); }
-.user-area button { background: none; border: none; font-family: inherit; font-weight: 700; cursor: pointer; color: var(--text-muted); }
+.brand span { color: #2563eb; }
+.user-area { font-size: 13px; font-weight: 600; color: #9ca3af; }
+.user-area button { background: none; border: none; font-family: inherit; font-weight: 700; cursor: pointer; color: #6b7280; }
 
 .hero { max-width: 800px; margin: 0 auto; text-align: center; }
-.hero-title { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 24px; line-height: 1; }
-.hero-title span { color: var(--accent); }
-.hero-sub { font-size: 18px; color: var(--text-muted); margin-bottom: 64px; }
+.hero-title { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 24px; line-height: 1.1; color: #000000 !important; }
+.hero-title span { color: #2563eb; }
+.hero-sub { font-size: 18px; color: #374151 !important; margin-bottom: 64px; }
 
-.glass-form { background: #fff; border: 1px solid var(--text); border-radius: 12px; padding: 40px; box-shadow: 12px 12px 0 var(--border); }
+.glass-form { background: #fff; border: 1px solid #000; border-radius: 12px; padding: 40px; box-shadow: 12px 12px 0 #f3f4f6; }
 .row { display: grid; grid-template-columns: 1.2fr 1.2fr 100px; gap: 24px; margin-bottom: 32px; text-align: left; }
-.input-group label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
-.input-group input { width: 100%; border: none; border-bottom: 1px solid var(--border); padding: 12px 0; font-family: inherit; font-size: 16px; font-weight: 600; outline: none; }
-.input-group input:focus { border-color: var(--text); }
-.cta-btn { width: 100%; padding: 18px; background: var(--text); color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.1s; }
+.input-group label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #4b5563 !important; margin-bottom: 8px; }
+.input-group input { 
+  width: 100%; 
+  background: #f9fafb; 
+  border: 1px solid #d1d5db; 
+  border-radius: 8px; 
+  padding: 14px 16px; 
+  font-family: inherit; 
+  font-size: 16px; 
+  font-weight: 600; 
+  color: #000000 !important; 
+  outline: none; 
+  transition: all 0.2s ease;
+}
+.input-group input:hover { border-color: #9ca3af; background: #f3f4f6; }
+.input-group input:focus { 
+  border-color: #2563eb; 
+  background: #ffffff; 
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); 
+}
+.input-group input::placeholder { color: #9ca3af; font-weight: 400; }
+.cta-btn { width: 100%; padding: 18px; background: #000; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.1s; }
 .cta-btn:active { transform: scale(0.99); }
 .cta-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
 /* ── DASHBOARD ARCH ── */
-.dashboard-root { display: flex; min-height: 100vh; }
+.dashboard-root { display: flex; flex: 1; width: 100%; background: #fff; }
 
 .sidebar { 
-  width: 280px; background: var(--surf); border-right: 1px solid var(--border); 
-  padding: 48px 24px; display: flex; flex-direction: column; 
-  position: sticky; top: 0; height: 100vh;
+  width: 260px; background: #fafafa; border-right: 1px solid #eeeeee; 
+  padding: 40px 24px; display: flex; flex-direction: column; 
+  position: sticky; top: 0; height: 100vh; flex-shrink: 0;
 }
-.sidebar-meta { padding-bottom: 32px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
-.badge-ready { display: inline-block; padding: 4px 10px; background: #dcfce7; color: #166534; font-size: 10px; font-weight: 800; border-radius: 100px; margin-bottom: 16px; }
-.sb-company { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
-.sb-role { font-size: 13px; color: var(--text-muted); }
+.sidebar-meta { padding-bottom: 32px; border-bottom: 1px solid #eeeeee; margin-bottom: 32px; }
+.badge-ready { display: inline-block; padding: 4px 10px; background: #e0f2fe; color: #0369a1; font-size: 10px; font-weight: 800; border-radius: 4px; margin-bottom: 16px; text-transform: uppercase; }
+.sb-company { font-size: 20px; font-weight: 800; letter-spacing: -0.04em; color: #000; }
+.sb-role { font-size: 12px; color: #6b7280; font-weight: 600; }
 
-.sb-nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.sb-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .sb-btn { 
-  display: flex; align-items: center; gap: 12px; padding: 12px 16px; 
-  border: none; background: none; border-radius: 8px; cursor: pointer;
-  font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text-muted); 
-  text-align: left; transition: all 0.2s;
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; 
+  border: none; background: none; border-radius: 6px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; color: #4b5563; 
+  text-align: left; transition: all 0.1s;
 }
-.sb-btn:hover { background: #f3f4f6; color: var(--text); }
-.sb-btn.active { background: var(--text); color: #fff; }
-.sb-icon { font-size: 16px; width: 20px; }
+.sb-btn:hover { background: #f3f4f6; color: #000; }
+.sb-btn.active { background: #000; color: #fff; }
+.sb-icon { font-size: 14px; width: 18px; opacity: 0.7; }
 
-.sidebar-footer { border-top: 1px solid var(--border); padding-top: 32px; }
-.sidebar-footer p { font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 16px; }
-.new-btn { width: 100%; padding: 10px; border: 1px solid var(--text); background: none; font-family: inherit; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.sidebar-footer { border-top: 1px solid #eeeeee; padding-top: 32px; }
+.sidebar-footer p { font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-bottom: 12px; }
+.new-btn { width: 100%; padding: 10px; border: 1px solid #000; background: #fff; font-family: inherit; font-weight: 800; border-radius: 6px; cursor: pointer; font-size: 11px; transition: background 0.2s; }
+.new-btn:hover { background: #000; color: #fff; }
 
 /* ── CONTENT AREA ── */
 .content-area { flex: 1; overflow-y: auto; background: #fff; }
-.view-wrapper { max-width: 800px; margin: 0 auto; padding: 80px 48px; }
+.view-wrapper { max-width: 1100px; padding: 60px 80px; margin: 0; }
 
-.doc-section { display: flex; flex-direction: column; }
-.section-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 16px; }
-.doc-title { font-size: 48px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 24px; line-height: 1; }
-.doc-lead { font-size: 20px; color: var(--text-muted); font-weight: 500; line-height: 1.5; }
+.doc-section { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.section-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #2563eb; margin-bottom: 8px; }
+.doc-title { font-size: 40px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 20px; line-height: 1; color: #000; }
+.doc-lead { font-size: 17px; color: #4b5563; font-weight: 500; line-height: 1.6; max-width: 750px; text-align: left; margin-bottom: 48px; }
 
-/* OVERVIEW SPECIFIC */
-.score-hero { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
-.score-big { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; }
-.score-tag { font-size: 20px; font-weight: 700; color: var(--accent); }
+/* OVERVIEW */
+.score-hero { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; }
+.score-big { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; color: #000; }
+.score-tag { font-size: 20px; font-weight: 700; color: #2563eb; }
 
-.sub-title { font-size: 24px; font-weight: 800; margin-bottom: 24px; letter-spacing: -0.02em; }
-.dot-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-.dot-item { display: flex; gap: 16px; font-size: 17px; font-weight: 600; }
-.dot-item::before { content: "⦿"; color: var(--accent); }
+.sub-title { font-size: 22px; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.02em; color: #000; }
+.dot-list { list-style: none; display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.dot-item { display: flex; gap: 14px; font-size: 16px; font-weight: 600; line-height: 1.5; color: #1f2937; }
+.dot-item::before { content: "→"; color: #2563eb; font-weight: 800; }
 
-.topic-flow { display: flex; flex-wrap: wrap; gap: 10px; }
-.topic-label { padding: 8px 16px; border: 1px solid var(--border); border-radius: 100px; font-size: 13px; font-weight: 700; background: var(--surf); }
+.topic-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #eeeeee; border-radius: 8px; width: 100%; max-width: 800px; }
+.topic-cell { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #eeeeee; border-right: 1px solid #eeeeee; }
+.topic-cell:nth-child(2n) { border-right: none; }
+.cell-name { font-size: 14px; font-weight: 700; color: #000; }
+.cell-status { font-size: 10px; font-weight: 800; color: #2563eb; text-transform: uppercase; }
 
-/* PLAN SPECIFIC */
-.roadmap-flow { display: flex; flex-direction: column; gap: 64px; }
-.week-heading { font-size: 22px; font-weight: 800; margin-bottom: 24px; }
-.week-heading span { color: var(--accent); font-weight: 500; }
-.check-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
-.check-item { display: flex; align-items: flex-start; gap: 16px; font-size: 16px; font-weight: 600; color: var(--text-muted); }
-.box { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; flex-shrink: 0; margin-top: 2px; }
+/* STUDY PLAN - STREAM ARCHITECTURE */
+.roadmap-stream { display: flex; flex-direction: column; gap: 48px; width: 100%; max-width: 900px; }
+.week-block { display: grid; grid-template-columns: 80px 1fr; gap: 24px; }
 
-/* QUESTIONS SPECIFIC */
-.questions-spacious { display: flex; flex-direction: column; gap: 40px; }
-.q-row { border-bottom: 1px solid var(--border); padding-bottom: 32px; }
-.q-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.q-idx { font-size: 13px; font-weight: 800; color: var(--text-dim); }
-.q-tag { font-size: 10px; font-weight: 800; text-transform: uppercase; background: var(--surf); padding: 4px 10px; border-radius: 6px; color: var(--text-muted); }
-.q-text { font-size: 20px; font-weight: 700; line-height: 1.4; }
+.week-marker { display: flex; flex-direction: column; align-items: center; position: relative; }
+.marker-line { width: 2px; flex: 1; background: #eeeeee; position: absolute; top: 40px; bottom: -48px; }
+.week-block:last-child .marker-line { display: none; }
+.marker-circle { 
+  width: 44px; height: 44px; background: #000; color: #fff; 
+  border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+  font-size: 11px; font-weight: 800; z-index: 2; 
+}
 
-/* BRIEFING SPECIFIC */
-.brief-grid { display: flex; flex-direction: column; gap: 40px; }
-.brief-chunk { padding: 40px; border-radius: 20px; border: 1px solid var(--border); }
-.brief-chunk.warning { background: #fffbeb; border-color: #fef3c7; }
-.chunk-title { font-size: 22px; font-weight: 800; margin-bottom: 24px; }
-.chunk-points { list-style: none; display: flex; flex-direction: column; gap: 16px; }
-.chunk-points li { font-size: 16px; font-weight: 600; position: relative; padding-left: 28px; }
-.chunk-points li::before { content: "→"; position: absolute; left: 0; color: var(--text-dim); }
+.week-content { display: flex; flex-direction: column; gap: 20px; }
+.week-title { font-size: 18px; font-weight: 800; color: #000; letter-spacing: -0.02em; }
 
-/* UTILS */
-.spacer-lg { height: 64px; }
-.fade-in { animation: fadeIn 0.4s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.task-stack { display: flex; flex-direction: column; gap: 12px; }
+.task-card { 
+  display: flex; align-items: flex-start; gap: 16px; padding: 20px; 
+  background: #ffffff; border: 1px solid #eeeeee; border-radius: 12px; 
+  transition: all 0.2s ease; 
+}
+.task-card:hover { border-color: #000; box-shadow: 8px 8px 0 #f3f4f6; transform: translateY(-2px); }
+.task-dot { width: 8px; height: 8px; background: #2563eb; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.task-text { font-size: 14px; font-weight: 600; color: #374151; line-height: 1.5; }
+
+/* QUESTIONS */
+.questions-list { display: flex; flex-direction: column; border-top: 1px solid #eeeeee; width: 100%; }
+.q-row { border-bottom: 1px solid #eeeeee; transition: background 0.1s; }
+.q-row:hover { background: #f9fafb; }
+.q-row.is-expanded { background: #fff; border-left: 4px solid #000; }
+
+.q-row-main { 
+  display: grid; 
+  grid-template-columns: 60px 1fr 180px 40px; 
+  padding: 24px 0; 
+  align-items: center; 
+  gap: 20px; 
+}
+.q-row-id { font-size: 11px; font-weight: 800; color: #9ca3af; font-family: monospace; }
+.q-row-text { font-size: 16px; font-weight: 700; color: #000; line-height: 1.4; padding-right: 20px; }
+.q-row-meta { display: flex; justify-content: flex-end; }
+.q-category-pill { font-size: 10px; font-weight: 800; text-transform: uppercase; background: #f3f4f6; color: #4b5563; padding: 4px 10px; border-radius: 4px; white-space: nowrap; }
+.q-toggle-icon { font-size: 20px; color: #9ca3af; text-align: center; cursor: pointer; }
+
+.q-row-expanded { padding: 0 0 32px 60px; }
+.q-coach-insight { background: #fafafa; padding: 24px; border-radius: 8px; border: 1px solid #eeeeee; }
+.insight-row { display: grid; grid-template-columns: 100px 1fr; gap: 20px; margin-bottom: 16px; }
+.insight-row:last-child { margin-bottom: 0; }
+.insight-label { font-size: 10px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 4px; }
+.insight-value { font-size: 14px; font-weight: 600; color: #374151; line-height: 1.6; }
+
+/* PROCESS */
+.process-list { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 800px; }
+.process-node { padding: 24px; border: 1px solid #eeeeee; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+.node-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.node-name { font-size: 16px; font-weight: 800; color: #000; }
+.node-time { font-size: 11px; font-weight: 800; color: #2563eb; }
+.node-desc { font-size: 14px; color: #4b5563; font-weight: 600; line-height: 1.5; }
+
+/* BRIEFING */
+.brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; }
+.brief-mod { padding: 32px; border: 1px solid #eeeeee; border-radius: 12px; }
+.brief-mod.warning { background: #fffbeb; border-color: #fef3c7; }
+.mod-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; color: #000; }
+.mod-points li { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px; padding-left: 20px; position: relative; }
+.mod-points li::before { content: "→"; position: absolute; left: 0; color: #9ca3af; }
+
+/* GLOBAL UTILS */
+.spacer-lg { height: 48px; }
+.fade-in { animation: fadeIn 0.2s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .loader { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; font-weight: 800; }
-.orbit { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--text); border-radius: 50%; animation: spin 1s linear infinite; }
+.orbit { width: 32px; height: 32px; border: 3px solid #eeeeee; border-top-color: #000; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1200px) {
+  .brief-grid { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 1024px) {
   .dashboard-root { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: static; padding: 24px; border-right: none; border-bottom: 1px solid var(--border); }
-  .sb-nav { flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
-  .view-wrapper { padding: 48px 24px; }
-  .doc-title { font-size: 36px; }
+  .sidebar { width: 100%; height: auto; position: static; padding: 24px; border-right: none; border-bottom: 1px solid #eeeeee; }
+  .sb-nav { flex-direction: row; overflow-x: auto; padding-bottom: 8px; gap: 16px; }
+  .view-wrapper { padding: 40px 24px; }
+  .doc-title { font-size: 28px; }
   .hero-title { font-size: 40px; }
   .row { grid-template-columns: 1fr; }
+  .q-row-main { grid-template-columns: 40px 1fr 40px; }
+  .q-row-meta .q-category-pill { display: none; }
+  .q-row-expanded { padding-left: 24px; }
+  .week-block { grid-template-columns: 1fr; gap: 12px; }
+  .marker-line { display: none; }
 }
 `;

@@ -18,11 +18,10 @@ serve(async (req) => {
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
 
     const queries = [
-      `${company} ${role} interview experience`,
-      `${company} ${role} interview questions`,
-      `${company} ${role} hiring process`,
-      `${company} ${role} system design`,
-      `${company} ${role} reddit interview`,
+      `${company} ${role} interview experience reddit`,
+      `${company} ${role} interview questions 2024 2025`,
+      `${company} ${role} hiring process glassdoor`,
+      `${company} ${role} seniority signals evaluation`,
     ];
 
     const responses = await Promise.all(
@@ -41,73 +40,73 @@ serve(async (req) => {
       )
     );
 
-    const results = responses.flatMap(
-      (r: any) => r.results || []
-    );
+    const results = responses.flatMap((r: any) => r.results || []);
 
     const searchContext = results
       .slice(0, 15)
       .map(
         (item: any) => `
 Title: ${item.title}
-
-Content:
-${item.content}
-
-URL:
-${item.url}
+Content: ${item.content}
+URL: ${item.url}
 `
       )
       .join("\n\n");
 
 const prompt = `
-You are an ELITE Silicon Valley Interview Coach. Your goal is to provide a surgical, actionable preparation guide for a candidate.
+You are a Lead Professional Recruiter and ELITE Career Coach. Your task is to SURGICALLY MINE the provided Search Context for REAL-WORLD interview questions and evaluation patterns at ${company} for ${role} roles.
 
-TARGET CONTEXT:
-Company: ${company}
-Role: ${role}
-Candidate Seniority: ${experience} years of experience
+TARGET CANDIDATE: ${experience} Years of Experience.
+
+SEARCH CONTEXT:
+${searchContext}
 
 CRITICAL INSTRUCTIONS:
-1. NO long paragraphs. NO generic "filler" text or fluff.
-2. Every sentence must provide high-signal, actionable value.
-3. Tailor the depth of topics and technical questions strictly to someone with ${experience} years of experience.
-4. Maintain a professional, elite, and encouraging tone.
-5. Use bullet points for tasks and insights.
+1. SUPPORT ANY ROLE: The user could be a Software Engineer, Product Manager, Nurse, Marketing Lead, or any other professional. 
+2. IGNORE generic, textbook advice. 
+3. PRIORITIZE questions and patterns found in the Search Context (Reddit, Glassdoor, Professional Blogs).
+4. For each of the 20 questions, provide:
+   - The specific prompt or task the interviewer gives.
+   - "Why they ask": The underlying skill, personality trait, or seniority signal they are testing.
+   - "Key to Answer": 2-3 specific points, metrics, or keywords the candidate MUST mention to pass.
+5. The 14-Day Preparation Plan must be actionable, daily tasks tailored to the specific role of ${role}.
 
-Return ONLY a valid JSON object (no markdown, no preamble) with this exact structure:
+Return ONLY a valid JSON object matching this exact structure:
 {
   "difficultyScore": <number 1-10>,
-  "difficultyLabel": <"Easy"|"Medium"|"Hard"|"Very Hard">,
-  "difficultyReason": "<ONE punchy sentence explaining why for a candidate with ${experience} years exp>",
+  "difficultyLabel": "<Optimized|Elevated|Complex|Extreme>",
+  "difficultyReason": "<One punchy sentence why for ${experience}yr candidate>",
   "interviewRounds": [
-    { "name": "<round name>", "description": "<actionable summary>", "duration": "<e.g. 45 min>" }
+    { "name": "<round name>", "description": "<actionable summary of what is evaluated>", "duration": "<e.g. 45 min>" }
   ],
-  "topTopics": ["<topic1>", "<topic2>", ...],
+  "topTopics": ["<topic/skill 1>", "<topic/skill 2>", ...],
   "topQuestions": [
-    { "question": "<question text>", "category": "<DSA|System Design|Java|Spring|Behavioral|Other>" }
+    { 
+      "question": "<specific question prompt>", 
+      "category": "<e.g. Technical|Behavioral|Leadership|Case Study|Clinical|Operational>",
+      "whyAsk": "<underlying seniority or skill signal they are looking for>",
+      "keyPoints": ["<must-mention point 1>", "<must-mention point 2>"]
+    }
   ],
   "preparationPlan": [
-    { "week": 1, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] },
-    { "week": 2, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] }
+    { "week": 1, "focus": "<focus area>", "tasks": ["<task 1>", "<task 2>", ...] },
+    { "week": 2, "focus": "<focus area>", "tasks": ["<task 1>", "<task 2>", ...] }
   ],
-  "keyInsights": ["<punchy insight 1>", "<punchy insight 2>", ...],
+  "keyInsights": ["<punchy strategy insight 1>", "<punchy strategy insight 2>", ...],
   "strategicBriefing": [
     { 
       "title": "<module title>", 
       "type": "<insight|warning|strategy>", 
-      "points": ["<actionable point 1>", "<actionable point 2>", ...] 
+      "points": ["<point 1>", "<point 2>", ...] 
     }
   ]
 }
 
 Rules:
 - topQuestions: exactly 20 items.
-- preparationPlan: exactly 2 weeks.
-- keyInsights: exactly 5-7 bullet points.
-- interviewRounds: 3-6 rounds.
-- strategicBriefing: 4-6 modular sections. DO NOT return a single long text block.
-- Return ONLY the JSON object.
+- BE EXTREMELY CONCISE. Avoid generic fluff or repetitive introductory phrases.
+- Every word must provide high-signal value for the specific role and company.
+- Return ONLY the JSON object. No markdown.
 `;
 
     const geminiResponse = await fetch(
@@ -135,7 +134,7 @@ Rules:
 
     const guide =
       geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response generated";
+      "{}";
 
     return new Response(
       JSON.stringify({
