@@ -66,10 +66,15 @@ export default function Login() {
   }, []);
 
   const signIn = async () => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const redirectUrl = isLocal 
+      ? `http://${window.location.host}/` 
+      : 'https://deveshk1.github.io/interview-prep-ai/';
+    
     await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
-        redirectTo: "https://deveshk1.github.io/interview-prep-ai/",
+        redirectTo: redirectUrl,
       },
     });
   };

@@ -4,219 +4,242 @@ import { generateInterviewGuide } from "./services/interviewService";
 import Login from "./components/Login";
 import { supabase } from "./lib/supabase";
 
-/* ─── tiny icons ─── */
-const Icon = ({ d, size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d={d} />
-  </svg>
-);
-const SparkleIcon = () => <Icon d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" size={14} />;
-const ChevronIcon = ({ open }) => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .25s" }}>
-    <path d="M6 9l6 6 6-6" />
-  </svg>
-);
-
-/* ─── category colors ─── */
-const CAT_COLORS = {
-  DSA:           { bg: "#1a1040", border: "#7c3aed", text: "#a78bfa" },
-  "System Design":{ bg: "#0d2218", border: "#059669", text: "#34d399" },
-  Java:          { bg: "#1a1200", border: "#b45309", text: "#fbbf24" },
-  Spring:        { bg: "#0e1a12", border: "#15803d", text: "#4ade80" },
-  Behavioral:    { bg: "#1a0d1a", border: "#9d174d", text: "#f472b6" },
-  Other:         { bg: "#101825", border: "#374151", text: "#94a3b8" },
-};
-
-/* ─── difficulty color ─── */
-function diffColor(score) {
-  if (score <= 3) return { text: "#4ade80", ring: "#16a34a", bg: "rgba(74,222,128,0.08)" };
-  if (score <= 5) return { text: "#facc15", ring: "#ca8a04", bg: "rgba(250,204,21,0.08)" };
-  if (score <= 7) return { text: "#fb923c", ring: "#ea580c", bg: "rgba(251,146,60,0.08)" };
-  return { text: "#f87171", ring: "#dc2626", bg: "rgba(248,113,113,0.08)" };
-}
-
-/* ─── Accordion ─── */
-function Accordion({ title, badge, children, defaultOpen = false, icon }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="accordion">
-      <button className="accordion-header" onClick={() => setOpen(o => !o)}>
-        <div className="accordion-title-row">
-          {icon && <span className="accordion-icon">{icon}</span>}
-          <span className="accordion-title">{title}</span>
-          {badge && <span className="accordion-badge">{badge}</span>}
-        </div>
-        <ChevronIcon open={open} />
-      </button>
-      {open && <div className="accordion-body">{children}</div>}
-    </div>
-  );
-}
-
-/* ─── CircularScore ─── */
-function CircularScore({ score }) {
-  const col = diffColor(score);
-  const r = 38, circ = 2 * Math.PI * r;
-  const dash = (score / 10) * circ;
-  return (
-    <div className="score-ring-wrap" style={{ background: col.bg }}>
-      <svg width={100} height={100} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
-        <circle cx={50} cy={50} r={r} fill="none" stroke={col.ring} strokeWidth={8}
-          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-          style={{ transition: "stroke-dasharray 1s ease" }} />
-      </svg>
-      <div className="score-ring-inner">
-        <span className="score-number" style={{ color: col.text }}>{score}</span>
-        <span className="score-of">/10</span>
-      </div>
-    </div>
-  );
-}
-
-/* ─── parse guide (string or object) ─── */
 function parseGuide(raw) {
   if (typeof raw === "object" && raw !== null) return raw;
-  try {
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
+  catch { return null; }
 }
 
-/* ─── Results Panel ─── */
-function ResultsPanel({ guide, company, role, experience }) {
-  const data = parseGuide(guide);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
+const DIFF = {
+  Easy:        { color: "#16a34a", light: "#f0fdf4", border: "#bbf7d0", label: "Easy" },
+  Medium:      { color: "#d97706", light: "#fffbeb", border: "#fde68a", label: "Medium" },
+  Hard:        { color: "#ea580c", light: "#fff7ed", border: "#fed7aa", label: "Hard" },
+  "Very Hard": { color: "#dc2626", light: "#fef2f2", border: "#fecaca", label: "Very Hard" },
+};
 
-  // Fallback: render markdown if JSON parsing failed
+const CAT = {
+  DSA:             { bg: "#f5f3ff", color: "#7c3aed", border: "#ddd6fe" },
+  "System Design": { bg: "#ecfeff", color: "#0891b2", border: "#a5f3fc" },
+  Java:            { bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+  Spring:          { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+  Behavioral:      { bg: "#fdf2f8", color: "#be185d", border: "#fbcfe8" },
+  Other:           { bg: "#f8fafc", color: "#475569", border: "#e2e8f0" },
+};
+
+function Chevron({ open }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.22s ease", color: "#94a3b8" }}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function Accordion({ title, subtitle, count, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "18px 22px", background: open ? "#fafafa" : "#fff", border: "none",
+        cursor: "pointer", textAlign: "left", gap: 16, transition: "background .15s"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 12.5, color: "#94a3b8", marginTop: 2 }}>{subtitle}</div>}
+          </div>
+          {count && (
+            <span style={{ fontSize: 12, fontWeight: 600, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 20, padding: "2px 10px" }}>
+              {count}
+            </span>
+          )}
+        </div>
+        <Chevron open={open} />
+      </button>
+      {open && (
+        <div style={{ padding: "0 22px 22px", background: "#fff", borderTop: "1px solid #f1f5f9" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultsView({ guide, company, role, experience }) {
+  const data = parseGuide(guide);
   if (!data || !data.difficultyScore) {
-    return (
-      <div className="result-doc">
-        <ReactMarkdown>{typeof guide === "string" ? guide : JSON.stringify(guide, null, 2)}</ReactMarkdown>
-      </div>
-    );
+    return <div style={{ padding: "32px 0", fontSize: 14, color: "#64748b" }}>
+      <ReactMarkdown>{typeof guide === "string" ? guide : JSON.stringify(guide, null, 2)}</ReactMarkdown>
+    </div>;
   }
 
-  const col = diffColor(data.difficultyScore);
+  const diff = DIFF[data.difficultyLabel] || DIFF["Hard"];
 
   return (
-    <div className="results-root">
-      {/* ── Meta header ── */}
-      <div className="results-meta">
-        <div className="results-meta-pill">
-          <span className="tag-dot" />
-          Guide Ready
+    <div>
+      {/* Page title */}
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase",
+            color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0",
+            borderRadius: 20, padding: "3px 11px", display: "flex", alignItems: "center", gap: 6
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+            Guide ready
+          </span>
         </div>
-        <span className="results-meta-sub">{company} · {role} · {experience} yr{experience !== "1" ? "s" : ""}</span>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.025em", margin: 0 }}>
+          {company} <span style={{ color: "#64748b", fontWeight: 500 }}>— {role}</span>
+        </h1>
+        <p style={{ fontSize: 13.5, color: "#94a3b8", marginTop: 6 }}>
+          {experience} year{experience !== "1" ? "s" : ""} experience · Generated now
+        </p>
       </div>
 
-      <div className="results-content">
+      {/* Row 1: Difficulty + Rounds */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
 
-        {/* ── Row 1: Difficulty + Rounds ── */}
-        <div className="row-2col">
-
-          {/* Difficulty card */}
-          <div className="card card-difficulty">
-            <div className="card-label">Interview Difficulty</div>
-            <div className="difficulty-body">
-              <CircularScore score={data.difficultyScore} />
-              <div className="difficulty-info">
-                <div className="difficulty-label" style={{ color: col.text }}>{data.difficultyLabel}</div>
-                <div className="difficulty-reason">{data.difficultyReason}</div>
-              </div>
+        {/* Difficulty card */}
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px 26px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div style={secLabel}>Difficulty rating</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: "50%", background: diff.light,
+              border: `2px solid ${diff.border}`, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", flexShrink: 0
+            }}>
+              <span style={{ fontSize: 26, fontWeight: 700, color: diff.color, lineHeight: 1 }}>{data.difficultyScore}</span>
+              <span style={{ fontSize: 10, color: diff.color, opacity: 0.65, marginTop: 1 }}>/10</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: diff.color, letterSpacing: "-0.02em" }}>{diff.label}</div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>Interview difficulty</div>
             </div>
           </div>
+          {data.difficultyReason && (
+            <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.65, margin: 0, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+              {data.difficultyReason}
+            </p>
+          )}
+        </div>
 
-          {/* Interview Rounds */}
-          <div className="card">
-            <div className="card-label">Interview Rounds</div>
-            <div className="rounds-list">
-              {(data.interviewRounds || []).map((r, i) => (
-                <div className="round-item" key={i}>
-                  <div className="round-num">{i + 1}</div>
-                  <div className="round-info">
-                    <div className="round-name">{r.name}</div>
-                    <div className="round-desc">{r.description}</div>
-                    {r.duration && <div className="round-dur">⏱ {r.duration}</div>}
-                  </div>
+        {/* Interview Rounds */}
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px 26px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div style={secLabel}>Interview rounds</div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {(data.interviewRounds || []).map((r, i, arr) => (
+              <div key={i} style={{ display: "flex", gap: 14 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{
+                    width: 26, height: 26, borderRadius: "50%", background: "#eef2ff",
+                    border: "1.5px solid #c7d2fe", color: "#4f46e5",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 700, flexShrink: 0
+                  }}>{i + 1}</div>
+                  {i < arr.length - 1 && <div style={{ width: 1, flex: 1, background: "#e2e8f0", minHeight: 16 }} />}
+                </div>
+                <div style={{ paddingBottom: i < arr.length - 1 ? 16 : 0, paddingTop: 3 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{r.name}</div>
+                  <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, marginTop: 2 }}>{r.description}</div>
+                  {r.duration && <div style={{ fontSize: 11, color: "#4f46e5", marginTop: 3, fontWeight: 500 }}>{r.duration}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Topics */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "22px 26px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+        <div style={secLabel}>Key topics to master</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {(data.topTopics || []).map((t, i) => (
+            <span key={i} style={{
+              fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 20,
+              background: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155"
+            }}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Insights */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "22px 26px", marginBottom: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+        <div style={secLabel}>💡 Key insights from candidates</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {(data.keyInsights || []).map((ins, i) => (
+            <div key={i} style={{
+              display: "flex", gap: 12, alignItems: "flex-start",
+              padding: "11px 14px", borderRadius: 9, background: "#f8fafc", border: "1px solid #f1f5f9"
+            }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4f46e5", marginTop: 6, flexShrink: 0 }} />
+              <span style={{ fontSize: 13.5, color: "#334155", lineHeight: 1.65 }}>{ins}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Accordions */}
+      <Accordion title="Top 20 interview questions" subtitle={`Most commonly asked for ${role} at ${company}`} count="20 questions" defaultOpen>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 16 }}>
+          {(data.topQuestions || []).map((q, i) => {
+            const cat = CAT[q.category] || CAT.Other;
+            return (
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
+                borderRadius: 10, background: "#f8fafc", border: "1px solid #f1f5f9"
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", minWidth: 22, paddingTop: 2, flexShrink: 0 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span style={{ flex: 1, fontSize: 13.5, color: "#1e293b", lineHeight: 1.6 }}>{q.question}</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6, flexShrink: 0, marginTop: 2,
+                  background: cat.bg, border: `1px solid ${cat.border}`, color: cat.color
+                }}>{q.category}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Accordion>
+
+      <Accordion title="2-week preparation plan" subtitle="Day-by-day study roadmap">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 16 }}>
+          {(data.preparationPlan || []).map((wk, i) => (
+            <div key={i} style={{ borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "18px 20px" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#4f46e5", marginBottom: 4 }}>
+                Week {wk.week}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 14 }}>{wk.focus}</div>
+              {(wk.tasks || []).map((task, j) => (
+                <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 9 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4f46e5", marginTop: 7, flexShrink: 0, opacity: 0.5 }} />
+                  <span style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.55 }}>{task}</span>
                 </div>
               ))}
             </div>
-          </div>
+          ))}
         </div>
+      </Accordion>
 
-        {/* ── Key Topics chips ── */}
-        <div className="card">
-          <div className="card-label">Most Important Topics</div>
-          <div className="topics-wrap">
-            {(data.topTopics || []).map((t, i) => (
-              <span className="topic-chip" key={i}>{t}</span>
-            ))}
-          </div>
+      <Accordion title="Full detailed analysis" subtitle="Complete breakdown — expand for depth">
+        <div style={{ paddingTop: 16, fontSize: 13.5, color: "#475569", lineHeight: 1.8 }} className="md-body">
+          <ReactMarkdown>{data.fullAnalysis || ""}</ReactMarkdown>
         </div>
+      </Accordion>
 
-        {/* ── Key Insights ── */}
-        <div className="card">
-          <div className="card-label">💡 Key Insights</div>
-          <div className="insights-list">
-            {(data.keyInsights || []).map((ins, i) => (
-              <div className="insight-item" key={i}>
-                <span className="insight-dot" />
-                <span>{ins}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Top Questions accordion ── */}
-        <Accordion title="Top Interview Questions" badge={`${(data.topQuestions || []).length} questions`} icon="❓">
-          <div className="questions-list">
-            {(data.topQuestions || []).map((q, i) => {
-              const cat = CAT_COLORS[q.category] || CAT_COLORS.Other;
-              return (
-                <div className="question-item" key={i}>
-                  <span className="q-num">{i + 1}</span>
-                  <span className="q-text">{q.question}</span>
-                  <span className="q-cat" style={{ background: cat.bg, border: `1px solid ${cat.border}`, color: cat.text }}>{q.category}</span>
-                </div>
-              );
-            })}
-          </div>
-        </Accordion>
-
-        {/* ── 14-Day Plan accordion ── */}
-        <Accordion title="Preparation Plan" badge="2 weeks" icon="📅">
-          <div className="plan-list">
-            {(data.preparationPlan || []).map((week, i) => (
-              <div className="plan-week" key={i}>
-                <div className="plan-week-header">Week {week.week} — <span>{week.focus}</span></div>
-                <ul className="plan-tasks">
-                  {(week.tasks || []).map((task, j) => (
-                    <li key={j} className="plan-task">{task}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Accordion>
-
-        {/* ── Full Analysis collapsed ── */}
-        <Accordion title="Full Detailed Analysis" icon="📄" defaultOpen={false}>
-          <div className="analysis-body">
-            <ReactMarkdown>{data.fullAnalysis || ""}</ReactMarkdown>
-          </div>
-        </Accordion>
-
-      </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════
-   MAIN APP
-══════════════════════════════════════════════════ */
+const secLabel = {
+  fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em",
+  textTransform: "uppercase", color: "#94a3b8", marginBottom: 18,
+};
+
+/* ════════════════════════════════ */
+
 export default function App() {
   const [company, setCompany]       = useState("");
   const [role, setRole]             = useState("");
@@ -224,7 +247,14 @@ export default function App() {
   const [guide, setGuide]           = useState(null);
   const [loading, setLoading]       = useState(false);
   const [session, setSession]       = useState(undefined);
-  const [dots, setDots]             = useState(0);
+  const [msgIdx, setMsgIdx]         = useState(0);
+
+  const MSGS = [
+    "Searching real interview experiences…",
+    "Analysing patterns from candidates…",
+    "Generating your personalised guide…",
+    "Almost there, putting it together…",
+  ];
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -234,19 +264,14 @@ export default function App() {
 
   useEffect(() => {
     if (!loading) return;
-    const t = setInterval(() => setDots(d => (d + 1) % 4), 500);
+    const t = setInterval(() => setMsgIdx(m => (m + 1) % MSGS.length), 2800);
     return () => clearInterval(t);
   }, [loading]);
 
-  const generateGuide = async () => {
-    setLoading(true);
-    setGuide(null);
-    try {
-      const raw = await generateInterviewGuide(company, role, experience);
-      setGuide(raw);
-    } catch {
-      setGuide("Something went wrong. Please try again.");
-    }
+  const generate = async () => {
+    setLoading(true); setGuide(null);
+    try { const raw = await generateInterviewGuide(company, role, experience); setGuide(raw); }
+    catch { setGuide("Something went wrong. Please try again."); }
     setLoading(false);
   };
 
@@ -254,403 +279,217 @@ export default function App() {
 
   if (session === undefined) return (
     <>
-      <style>{`body{margin:0;background:#060910;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:rgba(255,255,255,0.3);font-size:13px;}`}</style>
+      <style>{`body{margin:0;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#94a3b8;font-size:13px;}`}</style>
       <div>Loading…</div>
     </>
   );
-
   if (!session) return <Login />;
 
   return (
     <>
       <style>{CSS}</style>
-      <div className="shell">
+      <div className="root">
 
-        {/* NAV */}
-        <nav className="nav">
-          <div className="nav-left">
-            <div className="nav-wordmark">Interview <span>Prep</span> AI</div>
-            <div className="nav-pill">Beta</div>
-          </div>
-          <div className="nav-right">
-            <span className="nav-email">{session.user.email}</span>
-            <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
-          </div>
-        </nav>
-
-        <div className="main">
-          {/* LEFT */}
-          <div className="left-panel">
-            <div>
-              <div className="intro-label"><SparkleIcon /> AI-Powered</div>
-              <h1 className="intro-heading">Your personalized<br /><em>interview guide</em></h1>
-              <p className="intro-body">Enter your target company, role, and experience to get a curated preparation roadmap.</p>
+        {/* SIDEBAR */}
+        <aside className="sidebar">
+          <div className="sidebar-top">
+            <div className="logo">
+              <span className="logo-mark">P</span>
+              PrepAI
+              <span className="badge">Beta</span>
             </div>
 
-            <div className="form-divider" />
+            <div className="divider" />
 
-            <div className="form-section">
-              <div className="field">
-                <label className="field-label">Company Name</label>
-                <input className="field-input" type="text" placeholder="e.g. Google, Stripe, Razorpay"
-                  value={company} onChange={e => setCompany(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label">Role / Designation</label>
-                <input className="field-input" type="text" placeholder="e.g. Senior Software Engineer"
-                  value={role} onChange={e => setRole(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label">Years of Experience</label>
-                <input className="field-input" type="number" min="0" placeholder="e.g. 4"
-                  value={experience} onChange={e => setExperience(e.target.value)} />
-              </div>
+            <p className="sidebar-eyebrow">Your target role</p>
 
-              <p className={`status-hint ${canGenerate ? "ready" : ""}`}>
-                {canGenerate ? "✓ Ready to generate" : "Fill in all fields to continue"}
+            <div className="field">
+              <label className="field-label">Company</label>
+              <input className="inp" type="text" placeholder="Google, Razorpay, Stripe…"
+                value={company} onChange={e => setCompany(e.target.value)} />
+            </div>
+            <div className="field">
+              <label className="field-label">Role</label>
+              <input className="inp" type="text" placeholder="Senior Software Engineer…"
+                value={role} onChange={e => setRole(e.target.value)} />
+            </div>
+            <div className="field">
+              <label className="field-label">Years of experience</label>
+              <input className="inp" type="number" min="0" placeholder="e.g. 4"
+                value={experience} onChange={e => setExperience(e.target.value)} />
+            </div>
+
+            <button className="btn-gen" onClick={generate} disabled={loading || !canGenerate}>
+              {loading
+                ? <><span className="spinner" /> Generating…</>
+                : "Generate my guide →"
+              }
+            </button>
+
+            {!canGenerate && !loading && (
+              <p style={{ fontSize: 12, color: "#94a3b8", textAlign: "center" }}>Fill all fields to continue</p>
+            )}
+          </div>
+
+          <div className="sidebar-bottom">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div className="avatar">{(session.user.email || "U")[0].toUpperCase()}</div>
+              <div style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                {session.user.email}
+              </div>
+            </div>
+            <button className="btn-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>
+          </div>
+        </aside>
+
+        {/* MAIN */}
+        <main className="content">
+
+          {!loading && !guide && (
+            <div className="empty">
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#4f46e5", marginBottom: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                AI-powered interview prep
+              </div>
+              <h2 style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.025em", marginBottom: 10 }}>
+                Your personalized guide<br />starts here
+              </h2>
+              <p style={{ fontSize: 14, color: "#64748b", lineHeight: 1.7, maxWidth: 400, marginBottom: 36 }}>
+                Enter a company and role to get a complete interview guide — difficulty score, top questions, prep plan, and real candidate insights.
               </p>
-
-              <button className="btn-generate" onClick={generateGuide} disabled={loading || !canGenerate}>
-                {loading ? (
-                  <>
-                    <div className="spinner" />
-                    Generating{"·".repeat(dots)}
-                  </>
-                ) : (
-                  <><SparkleIcon /> Generate My Guide</>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* RIGHT */}
-          <div className="right-panel">
-            {!loading && !guide && (
-              <div className="empty-state">
-                <div className="empty-icon">📋</div>
-                <h2 className="empty-title">Your guide will appear here</h2>
-                <p className="empty-sub">Enter your target company and role to generate a personalized, structured guide.</p>
-                <div className="empty-steps">
-                  {["Enter the company you're targeting","Specify the role and seniority","Add your years of experience","Hit Generate — ready in seconds"].map((s, i) => (
-                    <div className="step" key={i}>
-                      <div className="step-num">{i + 1}</div>
-                      <span>{s}</span>
+              <div className="preview-grid">
+                {[
+                  { icon: "📊", t: "Difficulty score", d: "Calibrated from real data" },
+                  { icon: "❓", t: "Top 20 questions", d: "By category & topic" },
+                  { icon: "📅", t: "2-week plan", d: "Structured daily roadmap" },
+                  { icon: "💡", t: "Candidate insights", d: "Tips that got people hired" },
+                ].map((c, i) => (
+                  <div className="preview-card" key={i}>
+                    <span style={{ fontSize: 22 }}>{c.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 2 }}>{c.t}</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>{c.d}</div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {loading && (
-              <div className="loading-state">
-                <div className="loading-ring" />
-                <div>
-                  <p className="loading-text">Crafting your guide{"·".repeat(dots)}</p>
-                  <p className="loading-sub">Searching the web · Analysing interview patterns</p>
-                </div>
-                <div className="loading-bar-track"><div className="loading-bar-fill" /></div>
-              </div>
-            )}
+          {loading && (
+            <div className="loading-wrap">
+              <div className="loading-ring" />
+              <div style={{ fontSize: 15, fontWeight: 500, color: "#334155" }}>{MSGS[msgIdx]}</div>
+              <div style={{ fontSize: 13, color: "#94a3b8" }}>This usually takes 10–15 seconds</div>
+              <div className="loading-bar"><div className="loading-fill" /></div>
+            </div>
+          )}
 
-            {guide && !loading && (
-              <ResultsPanel guide={guide} company={company} role={role} experience={experience} />
-            )}
-          </div>
-        </div>
+          {guide && !loading && (
+            <ResultsView guide={guide} company={company} role={role} experience={experience} />
+          )}
+        </main>
       </div>
     </>
   );
 }
 
-/* ══════════════════════════════════════════════════
-   CSS
-══════════════════════════════════════════════════ */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
 :root {
-  --bg:      #060910;
-  --surf:    #0c1018;
-  --surf2:   #111720;
-  --surf3:   #161e2b;
-  --border:  rgba(255,255,255,0.07);
-  --border2: rgba(255,255,255,0.12);
-  --text:    #dde2ee;
-  --text2:   rgba(221,226,238,0.52);
-  --text3:   rgba(221,226,238,0.26);
-  --accent:  #4f8ef7;
-  --sans:    'Plus Jakarta Sans',sans-serif;
-  --serif:   'Instrument Serif',serif;
+  --sans: 'Inter', system-ui, sans-serif;
 }
 
-body { background:var(--bg); font-family:var(--sans); color:var(--text); -webkit-font-smoothing:antialiased; }
+body { background: #f1f5f9; font-family: var(--sans); color: #1e293b; -webkit-font-smoothing: antialiased; }
 
-/* ── SHELL ── */
-.shell {
-  min-height:100vh; display:flex; flex-direction:column;
-  background:
-    radial-gradient(ellipse 800px 500px at 65% -80px, rgba(79,142,247,0.09) 0%, transparent 65%),
-    radial-gradient(ellipse 500px 400px at -60px 85%, rgba(52,211,153,0.04) 0%, transparent 65%),
-    var(--bg);
-}
+.root { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
 
-/* ── NAV ── */
-.nav {
-  height:56px; display:flex; align-items:center; justify-content:space-between;
-  padding:0 24px; border-bottom:1px solid var(--border);
-  background:rgba(6,9,16,0.85); backdrop-filter:blur(12px);
-  position:sticky; top:0; z-index:50;
+/* ── SIDEBAR ── */
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  padding: 28px 22px;
+  box-shadow: 1px 0 0 #f1f5f9;
 }
-.nav-left { display:flex; align-items:center; gap:10px; }
-.nav-wordmark { font-size:14px; font-weight:700; letter-spacing:-.02em; color:var(--text); }
-.nav-wordmark span { color:var(--accent); }
-.nav-pill { font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  background:rgba(79,142,247,0.12); color:var(--accent); border:1px solid rgba(79,142,247,0.25);
-  border-radius:20px; padding:2px 8px; }
-.nav-right { display:flex; align-items:center; gap:12px; }
-.nav-email { font-size:12px; color:var(--text2); }
-.btn-ghost { font-size:12px; font-family:var(--sans); color:var(--text2); background:none; border:1px solid var(--border2);
-  border-radius:7px; padding:5px 12px; cursor:pointer; transition:all .15s; }
-.btn-ghost:hover { color:var(--text); border-color:rgba(255,255,255,0.25); }
+.sidebar-top { display: flex; flex-direction: column; gap: 14px; }
 
-/* ── MAIN LAYOUT ── */
-.main {
-  flex:1; display:grid; grid-template-columns:340px 1fr;
-  min-height:0;
+.logo {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 16px; font-weight: 700; color: #0f172a;
+  letter-spacing: -0.02em; margin-bottom: 4px;
 }
+.logo-mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: #4f46e5; color: #fff; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.badge {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+  background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe;
+  border-radius: 20px; padding: 2px 8px;
+}
+.divider { height: 1px; background: #f1f5f9; }
+.sidebar-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; }
 
-/* ── LEFT PANEL ── */
-.left-panel {
-  padding:36px 28px; display:flex; flex-direction:column; gap:28px;
-  border-right:1px solid var(--border);
-  background:rgba(12,16,24,0.6);
-  position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto;
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 12px; font-weight: 500; color: #64748b; }
+.inp {
+  width: 100%; padding: 9px 12px; background: #f8fafc;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  color: #0f172a; font-size: 13px; font-family: var(--sans);
+  outline: none; transition: border-color .15s, box-shadow .15s;
 }
-.intro-label {
-  display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
-  letter-spacing:.07em; text-transform:uppercase; color:var(--accent); margin-bottom:14px;
-}
-.intro-heading {
-  font-family:var(--serif); font-size:28px; line-height:1.28; color:var(--text);
-  letter-spacing:-.01em; margin-bottom:12px;
-}
-.intro-heading em { font-style:italic; color:var(--accent); }
-.intro-body { font-size:13px; line-height:1.7; color:var(--text2); }
+.inp::placeholder { color: #cbd5e1; }
+.inp:focus { background: #fff; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.08); }
 
-.form-divider { height:1px; background:var(--border); }
+.btn-gen {
+  width: 100%; padding: 11px 16px; background: #4f46e5; color: #fff;
+  border: none; border-radius: 9px; font-size: 13.5px; font-weight: 600;
+  font-family: var(--sans); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; gap: 8px;
+  transition: background .15s; margin-top: 4px;
+  box-shadow: 0 1px 3px rgba(79,70,229,0.3);
+}
+.btn-gen:hover:not(:disabled) { background: #4338ca; }
+.btn-gen:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.form-section { display:flex; flex-direction:column; gap:16px; }
-.field { display:flex; flex-direction:column; gap:6px; }
-.field-label { font-size:11.5px; font-weight:600; color:var(--text2); letter-spacing:.04em; }
-.field-input {
-  width:100%; padding:10px 14px; background:var(--surf2); border:1px solid var(--border2);
-  border-radius:9px; color:var(--text); font-size:13.5px; font-family:var(--sans);
-  outline:none; transition:border-color .15s, box-shadow .15s;
-}
-.field-input::placeholder { color:var(--text3); }
-.field-input:focus { border-color:rgba(79,142,247,0.5); box-shadow:0 0 0 3px rgba(79,142,247,0.08); }
+.sidebar-bottom { display: flex; flex-direction: column; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: #eef2ff; border: 1px solid #c7d2fe; color: #4f46e5; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.btn-signout { font-size: 12px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: var(--sans); width: 100%; transition: background .15s; }
+.btn-signout:hover { background: #f1f5f9; }
 
-.status-hint { font-size:12px; color:var(--text3); transition:color .2s; }
-.status-hint.ready { color:#34d399; }
+/* ── CONTENT ── */
+.content { padding: 52px 64px; max-width: 920px; width: 100%; }
 
-.btn-generate {
-  width:100%; padding:12px 20px; background:var(--accent); color:#fff;
-  border:none; border-radius:10px; font-size:13.5px; font-weight:600;
-  font-family:var(--sans); cursor:pointer; display:flex; align-items:center;
-  justify-content:center; gap:8px; transition:all .18s;
-  box-shadow:0 0 20px rgba(79,142,247,0.3);
-}
-.btn-generate:hover:not(:disabled) { background:#3b7ef3; box-shadow:0 0 28px rgba(79,142,247,0.45); transform:translateY(-1px); }
-.btn-generate:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+/* ── EMPTY ── */
+.empty { padding-top: 24px; }
+.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 460px; }
+.preview-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
 
-.spinner {
-  width:14px; height:14px; border:2px solid rgba(255,255,255,0.3);
-  border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;
-}
-@keyframes spin { to { transform:rotate(360deg); } }
+/* ── LOADING ── */
+.loading-wrap { padding-top: 80px; display: flex; flex-direction: column; gap: 16px; }
+.loading-ring { width: 34px; height: 34px; border: 2.5px solid #e2e8f0; border-top-color: #4f46e5; border-radius: 50%; animation: spin .9s linear infinite; }
+.loading-bar { width: 200px; height: 3px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.loading-fill { height: 100%; width: 40%; background: #4f46e5; border-radius: 4px; animation: slide 1.6s ease-in-out infinite; }
+@keyframes slide { 0% { transform: translateX(-200%); } 100% { transform: translateX(450%); } }
 
-/* ── RIGHT PANEL ── */
-.right-panel { overflow-y:auto; }
+/* ── MARKDOWN ── */
+.md-body p { margin-bottom: 12px; }
+.md-body h2, .md-body h3 { font-size: 14px; font-weight: 600; color: #0f172a; margin: 16px 0 8px; }
+.md-body ul, .md-body ol { padding-left: 18px; margin-bottom: 12px; }
+.md-body li { font-size: 13px; color: #475569; line-height: 1.65; margin-bottom: 4px; }
+.md-body strong { color: #0f172a; font-weight: 600; }
 
-/* ── EMPTY / LOADING ── */
-.empty-state, .loading-state {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:20px; padding:80px 40px; text-align:center; height:100%;
-}
-.empty-icon { font-size:42px; opacity:.5; }
-.empty-title { font-size:18px; font-weight:600; color:var(--text); }
-.empty-sub { font-size:13px; color:var(--text2); max-width:320px; line-height:1.65; }
-.empty-steps { display:flex; flex-direction:column; gap:10px; width:100%; max-width:340px; text-align:left; }
-.step { display:flex; align-items:flex-start; gap:12px; font-size:13px; color:var(--text2); }
-.step-num {
-  min-width:22px; height:22px; border-radius:50%; background:var(--accent);
-  color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
-}
-.loading-ring {
-  width:42px; height:42px; border:3px solid var(--border2); border-top-color:var(--accent);
-  border-radius:50%; animation:spin .9s linear infinite;
-}
-.loading-text { font-size:15px; font-weight:600; color:var(--text); }
-.loading-sub  { font-size:12.5px; color:var(--text2); margin-top:4px; }
-.loading-bar-track { width:220px; height:3px; background:var(--border2); border-radius:4px; overflow:hidden; }
-.loading-bar-fill  { height:100%; width:60%; background:var(--accent); border-radius:4px;
-  animation:slide 1.5s ease-in-out infinite; }
-@keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(280%)} }
-
-/* ── RESULTS ROOT ── */
-.results-root { display:flex; flex-direction:column; }
-.results-meta {
-  display:flex; align-items:center; gap:12px; padding:14px 28px;
-  border-bottom:1px solid var(--border); background:rgba(12,16,24,0.7);
-  backdrop-filter:blur(8px); position:sticky; top:0; z-index:10;
-}
-.results-meta-pill {
-  display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
-  color:#34d399; background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.25);
-  border-radius:20px; padding:3px 10px;
-}
-.tag-dot { width:6px; height:6px; border-radius:50%; background:#34d399; animation:pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-.results-meta-sub { font-size:12.5px; color:var(--text2); }
-
-.results-content {
-  padding:24px 28px 48px;
-  display:flex; flex-direction:column; gap:16px;
-}
-
-/* ── CARDS ── */
-.card {
-  background:var(--surf2); border:1px solid var(--border);
-  border-radius:14px; padding:20px 22px;
-}
-.card-label {
-  font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--text3); margin-bottom:16px;
-}
-
-/* ── 2-col row ── */
-.row-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-
-/* ── Difficulty ── */
-.card-difficulty {}
-.difficulty-body { display:flex; align-items:center; gap:18px; }
-.score-ring-wrap {
-  position:relative; width:100px; height:100px; display:flex;
-  align-items:center; justify-content:center; border-radius:50%; flex-shrink:0;
-}
-.score-ring-inner {
-  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  display:flex; flex-direction:column; align-items:center; line-height:1;
-}
-.score-number { font-size:26px; font-weight:700; letter-spacing:-.02em; }
-.score-of     { font-size:11px; color:var(--text3); margin-top:2px; }
-.difficulty-info { flex:1; }
-.difficulty-label  { font-size:20px; font-weight:700; letter-spacing:-.02em; margin-bottom:6px; }
-.difficulty-reason { font-size:12.5px; color:var(--text2); line-height:1.55; }
-
-/* ── Rounds ── */
-.rounds-list { display:flex; flex-direction:column; gap:10px; }
-.round-item  { display:flex; align-items:flex-start; gap:12px; }
-.round-num {
-  min-width:24px; height:24px; border-radius:50%; background:rgba(79,142,247,0.15);
-  border:1px solid rgba(79,142,247,0.3); color:var(--accent); font-size:11px; font-weight:700;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
-}
-.round-name  { font-size:13px; font-weight:600; color:var(--text); margin-bottom:2px; }
-.round-desc  { font-size:12px; color:var(--text2); line-height:1.5; }
-.round-dur   { font-size:11px; color:var(--text3); margin-top:3px; }
-
-/* ── Topics ── */
-.topics-wrap { display:flex; flex-wrap:wrap; gap:8px; }
-.topic-chip {
-  font-size:12.5px; font-weight:500;
-  background:rgba(79,142,247,0.1); border:1px solid rgba(79,142,247,0.22); color:#93c5fd;
-  border-radius:20px; padding:5px 14px; transition:all .15s;
-}
-.topic-chip:hover { background:rgba(79,142,247,0.18); transform:translateY(-1px); }
-
-/* ── Insights ── */
-.insights-list { display:flex; flex-direction:column; gap:10px; }
-.insight-item {
-  display:flex; align-items:flex-start; gap:12px; font-size:13px;
-  color:var(--text2); line-height:1.6;
-  background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);
-  border-radius:9px; padding:10px 14px;
-}
-.insight-dot {
-  min-width:7px; height:7px; border-radius:50%;
-  background:var(--accent); margin-top:5px; flex-shrink:0;
-}
-
-/* ── Accordion ── */
-.accordion { background:var(--surf2); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-.accordion-header {
-  width:100%; display:flex; align-items:center; justify-content:space-between;
-  padding:16px 20px; background:none; border:none; color:var(--text); font-family:var(--sans);
-  cursor:pointer; transition:background .15s;
-}
-.accordion-header:hover { background:rgba(255,255,255,0.03); }
-.accordion-title-row { display:flex; align-items:center; gap:10px; }
-.accordion-icon  { font-size:16px; }
-.accordion-title { font-size:14px; font-weight:600; }
-.accordion-badge {
-  font-size:10.5px; font-weight:600; background:rgba(79,142,247,0.12);
-  border:1px solid rgba(79,142,247,0.22); color:var(--accent);
-  border-radius:20px; padding:2px 9px;
-}
-.accordion-body { padding:4px 20px 20px; border-top:1px solid var(--border); }
-
-/* ── Questions ── */
-.questions-list { display:flex; flex-direction:column; gap:8px; padding-top:12px; }
-.question-item {
-  display:flex; align-items:flex-start; gap:12px; padding:11px 14px;
-  background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);
-  border-radius:9px; transition:background .15s;
-}
-.question-item:hover { background:rgba(255,255,255,0.04); }
-.q-num  { min-width:22px; font-size:11px; font-weight:700; color:var(--text3); padding-top:1px; flex-shrink:0; }
-.q-text { flex:1; font-size:13px; color:var(--text2); line-height:1.55; }
-.q-cat  { font-size:10.5px; font-weight:600; border-radius:6px; padding:2px 8px; flex-shrink:0; margin-top:1px; }
-
-/* ── Plan ── */
-.plan-list { display:flex; flex-direction:column; gap:20px; padding-top:14px; }
-.plan-week-header {
-  font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;
-}
-.plan-week-header span { color:var(--accent); font-weight:500; }
-.plan-tasks { display:flex; flex-direction:column; gap:7px; list-style:none; }
-.plan-task {
-  font-size:13px; color:var(--text2); line-height:1.55;
-  padding:9px 14px 9px 36px; position:relative;
-  background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04);
-  border-radius:8px;
-}
-.plan-task::before {
-  content:'';position:absolute;left:14px;top:50%;transform:translateY(-50%);
-  width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.7;
-}
-
-/* ── Full Analysis markdown ── */
-.analysis-body { padding-top:14px; }
-.analysis-body p  { font-size:13.5px; color:var(--text2); line-height:1.75; margin-bottom:12px; }
-.analysis-body h2,.analysis-body h3 { color:var(--text); font-size:14px; margin:16px 0 8px; }
-.analysis-body ul { padding-left:20px; margin-bottom:12px; }
-.analysis-body li { font-size:13px; color:var(--text2); line-height:1.65; margin-bottom:4px; }
-.analysis-body strong { color:var(--text); }
-
-/* ── Fallback markdown ── */
-.result-doc { padding:32px 28px; }
-.result-doc p { font-size:13.5px; color:var(--text2); line-height:1.75; margin-bottom:12px; }
-
-/* ── MOBILE ── */
-@media (max-width:900px) {
-  .main { grid-template-columns:1fr; }
-  .left-panel { position:static; height:auto; border-right:none; border-bottom:1px solid var(--border); }
-  .row-2col { grid-template-columns:1fr; }
-  .results-content { padding:20px 16px 48px; }
-  .results-meta { padding:12px 16px; }
-  .nav-email { display:none; }
+/* ── RESPONSIVE ── */
+@media (max-width: 860px) {
+  .root { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid #e2e8f0; }
+  .content { padding: 28px 18px; }
+  .preview-grid { grid-template-columns: 1fr; }
 }
 `;
