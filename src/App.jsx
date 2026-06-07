@@ -9,8 +9,8 @@ import {
 } from "@mui/material";
 
 import ReactMarkdown from "react-markdown";
-import { generateInterviewGuide } from "./services/geminiService";
-import { searchCompany } from "./services/searchService";
+
+import { generateInterviewGuide } from "./services/interviewService";
 
 function App() {
   const [company, setCompany] = useState("");
@@ -20,41 +20,26 @@ function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const generateGuide = async () => {
-    setLoading(true);
+const generateGuide = async () => {
+  setLoading(true);
 
-    try {
-      const searchResponse = await searchCompany(
+  try {
+    const guide =
+      await generateInterviewGuide(
         company,
-        role
+        role,
+        experience
       );
 
-      console.log(
-        "Search Results:",
-        searchResponse
-      );
+    setResult(guide);
 
-      const guide =
-        await generateInterviewGuide(
-          company,
-          role,
-          experience,
-          searchResponse.results
-        );
+  } catch (err) {
+    console.error(err);
+    setResult("Error generating guide");
+  }
 
-      setResult(guide);
-
-    } catch (err) {
-
-      console.error(err);
-
-      setResult(
-        "Error generating guide"
-      );
-    }
-
-    setLoading(false);
-  };
+  setLoading(false);
+};
 
   return (
     <Container maxWidth="md" sx={{ mt: 5 }}>
