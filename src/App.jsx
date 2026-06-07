@@ -4,242 +4,199 @@ import { generateInterviewGuide } from "./services/interviewService";
 import Login from "./components/Login";
 import { supabase } from "./lib/supabase";
 
-function parseGuide(raw) {
-  if (typeof raw === "object" && raw !== null) return raw;
-  try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
-  catch { return null; }
-}
+/* ─── tiny icons ─── */
+const Icon = ({ d, size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+const SparkleIcon = () => <Icon d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" size={14} />;
 
-const DIFF = {
-  Easy:        { color: "#16a34a", light: "#f0fdf4", border: "#bbf7d0", label: "Easy" },
-  Medium:      { color: "#d97706", light: "#fffbeb", border: "#fde68a", label: "Medium" },
-  Hard:        { color: "#ea580c", light: "#fff7ed", border: "#fed7aa", label: "Hard" },
-  "Very Hard": { color: "#dc2626", light: "#fef2f2", border: "#fecaca", label: "Very Hard" },
+/* ─── category colors ─── */
+const CAT_COLORS = {
+  DSA:           { bg: "#f5f3ff", border: "#ddd6fe", text: "#7c3aed" },
+  "System Design":{ bg: "#ecfeff", border: "#a5f3fc", text: "#0891b2" },
+  Java:          { bg: "#fffbeb", border: "#fde68a", text: "#b45309" },
+  Spring:        { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d" },
+  Behavioral:    { bg: "#fdf2f8", border: "#fbcfe8", text: "#be185d" },
+  Other:         { bg: "#f8fafc", border: "#e2e8f0", text: "#475569" },
 };
 
-const CAT = {
-  DSA:             { bg: "#f5f3ff", color: "#7c3aed", border: "#ddd6fe" },
-  "System Design": { bg: "#ecfeff", color: "#0891b2", border: "#a5f3fc" },
-  Java:            { bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
-  Spring:          { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-  Behavioral:      { bg: "#fdf2f8", color: "#be185d", border: "#fbcfe8" },
-  Other:           { bg: "#f8fafc", color: "#475569", border: "#e2e8f0" },
-};
-
-function Chevron({ open }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-      style={{ transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.22s ease", color: "#94a3b8" }}>
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
+/* ─── difficulty color ─── */
+function diffColor(score) {
+  if (score <= 3) return { text: "#16a34a", ring: "#22c55e", bg: "#f0fdf4" };
+  if (score <= 5) return { text: "#ca8a04", ring: "#eab308", bg: "#fefce8" };
+  if (score <= 7) return { text: "#ea580c", ring: "#f97316", bg: "#fff7ed" };
+  return { text: "#dc2626", ring: "#ef4444", bg: "#fef2f2" };
 }
 
-function Accordion({ title, subtitle, count, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
+/* ─── CircularScore ─── */
+function CircularScore({ score }) {
+  const col = diffColor(score);
+  const r = 38, circ = 2 * Math.PI * r;
+  const dash = (score / 10) * circ;
   return (
-    <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "18px 22px", background: open ? "#fafafa" : "#fff", border: "none",
-        cursor: "pointer", textAlign: "left", gap: 16, transition: "background .15s"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a" }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 12.5, color: "#94a3b8", marginTop: 2 }}>{subtitle}</div>}
-          </div>
-          {count && (
-            <span style={{ fontSize: 12, fontWeight: 600, background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0", borderRadius: 20, padding: "2px 10px" }}>
-              {count}
-            </span>
-          )}
-        </div>
-        <Chevron open={open} />
-      </button>
-      {open && (
-        <div style={{ padding: "0 22px 22px", background: "#fff", borderTop: "1px solid #f1f5f9" }}>
-          {children}
-        </div>
-      )}
+    <div className="score-ring-wrap" style={{ background: col.bg }}>
+      <svg width={100} height={100} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(0,0,0,0.03)" strokeWidth={6} />
+        <circle cx={50} cy={50} r={r} fill="none" stroke={col.ring} strokeWidth={6}
+          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1s ease" }} />
+      </svg>
+      <div className="score-ring-inner">
+        <span className="score-number" style={{ color: col.text }}>{score}</span>
+        <span className="score-of">/10</span>
+      </div>
     </div>
   );
 }
 
-function ResultsView({ guide, company, role, experience }) {
+/* ─── parse guide (string or object) ─── */
+function parseGuide(raw) {
+  if (typeof raw === "object" && raw !== null) return raw;
+  try {
+    const clean = raw.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    return null;
+  }
+}
+
+/* ─── Results Panel ─── */
+function ResultsPanel({ guide, company, role, experience }) {
   const data = parseGuide(guide);
+
   if (!data || !data.difficultyScore) {
-    return <div style={{ padding: "32px 0", fontSize: 14, color: "#64748b" }}>
-      <ReactMarkdown>{typeof guide === "string" ? guide : JSON.stringify(guide, null, 2)}</ReactMarkdown>
-    </div>;
+    return (
+      <div className="result-doc">
+        <ReactMarkdown>{typeof guide === "string" ? guide : JSON.stringify(guide, null, 2)}</ReactMarkdown>
+      </div>
+    );
   }
 
-  const diff = DIFF[data.difficultyLabel] || DIFF["Hard"];
+  const col = diffColor(data.difficultyScore);
 
   return (
-    <div>
-      {/* Page title */}
-      <div style={{ marginBottom: 36 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase",
-            color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0",
-            borderRadius: 20, padding: "3px 11px", display: "flex", alignItems: "center", gap: 6
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-            Guide ready
-          </span>
+    <div className="results-root">
+      <div className="results-header">
+        <div className="results-title-group">
+          <h2 className="results-title">{company} <span>{role}</span></h2>
+          <p className="results-subtitle">Personalized Interview Roadmap · {experience} Year{experience !== "1" ? "s" : ""} Experience</p>
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.025em", margin: 0 }}>
-          {company} <span style={{ color: "#64748b", fontWeight: 500 }}>— {role}</span>
-        </h1>
-        <p style={{ fontSize: 13.5, color: "#94a3b8", marginTop: 6 }}>
-          {experience} year{experience !== "1" ? "s" : ""} experience · Generated now
-        </p>
+        <div className="results-badge">
+          <span className="tag-dot" />
+          Analysis Complete
+        </div>
       </div>
 
-      {/* Row 1: Difficulty + Rounds */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-
-        {/* Difficulty card */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px 26px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={secLabel}>Difficulty rating</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
-            <div style={{
-              width: 76, height: 76, borderRadius: "50%", background: diff.light,
-              border: `2px solid ${diff.border}`, display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", flexShrink: 0
-            }}>
-              <span style={{ fontSize: 26, fontWeight: 700, color: diff.color, lineHeight: 1 }}>{data.difficultyScore}</span>
-              <span style={{ fontSize: 10, color: diff.color, opacity: 0.65, marginTop: 1 }}>/10</span>
-            </div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: diff.color, letterSpacing: "-0.02em" }}>{diff.label}</div>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>Interview difficulty</div>
+      <div className="bento-grid">
+        {/* Difficulty - Top Left */}
+        <div className="bento-card bento-difficulty">
+          <div className="card-label">Difficulty Score</div>
+          <div className="difficulty-content">
+            <CircularScore score={data.difficultyScore} />
+            <div className="difficulty-meta">
+              <div className="difficulty-level" style={{ color: col.text }}>{data.difficultyLabel}</div>
+              <div className="difficulty-reason">{data.difficultyReason}</div>
             </div>
           </div>
-          {data.difficultyReason && (
-            <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.65, margin: 0, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
-              {data.difficultyReason}
-            </p>
-          )}
         </div>
 
-        {/* Interview Rounds */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "24px 26px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={secLabel}>Interview rounds</div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {(data.interviewRounds || []).map((r, i, arr) => (
-              <div key={i} style={{ display: "flex", gap: 14 }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{
-                    width: 26, height: 26, borderRadius: "50%", background: "#eef2ff",
-                    border: "1.5px solid #c7d2fe", color: "#4f46e5",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 700, flexShrink: 0
-                  }}>{i + 1}</div>
-                  {i < arr.length - 1 && <div style={{ width: 1, flex: 1, background: "#e2e8f0", minHeight: 16 }} />}
-                </div>
-                <div style={{ paddingBottom: i < arr.length - 1 ? 16 : 0, paddingTop: 3 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{r.name}</div>
-                  <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, marginTop: 2 }}>{r.description}</div>
-                  {r.duration && <div style={{ fontSize: 11, color: "#4f46e5", marginTop: 3, fontWeight: 500 }}>{r.duration}</div>}
+        {/* Key Insights - Bottom Left */}
+        <div className="bento-card bento-insights">
+          <div className="card-label">💡 Key Insights</div>
+          <div className="insights-list">
+            {(data.keyInsights || []).map((ins, i) => (
+              <div className="insight-item" key={i}>
+                <span className="insight-dot" />
+                <span>{ins}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Interview Rounds - Top Center */}
+        <div className="bento-card bento-rounds">
+          <div className="card-label">Interview Process</div>
+          <div className="rounds-scroll">
+            {(data.interviewRounds || []).map((r, i) => (
+              <div className="round-item" key={i}>
+                <div className="round-num">{i + 1}</div>
+                <div className="round-info">
+                  <div className="round-name">{r.name}</div>
+                  <div className="round-desc">{r.description}</div>
+                  {r.duration && <div className="round-dur">Duration: {r.duration}</div>}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Topics */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "22px 26px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <div style={secLabel}>Key topics to master</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {(data.topTopics || []).map((t, i) => (
-            <span key={i} style={{
-              fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 20,
-              background: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155"
-            }}>{t}</span>
-          ))}
+        {/* Topics - Top Right */}
+        <div className="bento-card bento-topics">
+          <div className="card-label">Core Topics</div>
+          <div className="topics-wrap">
+            {(data.topTopics || []).map((t, i) => (
+              <span className="topic-chip" key={i}>{t}</span>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Insights */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "22px 26px", marginBottom: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <div style={secLabel}>💡 Key insights from candidates</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          {(data.keyInsights || []).map((ins, i) => (
-            <div key={i} style={{
-              display: "flex", gap: 12, alignItems: "flex-start",
-              padding: "11px 14px", borderRadius: 9, background: "#f8fafc", border: "1px solid #f1f5f9"
-            }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4f46e5", marginTop: 6, flexShrink: 0 }} />
-              <span style={{ fontSize: 13.5, color: "#334155", lineHeight: 1.65 }}>{ins}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Accordions */}
-      <Accordion title="Top 20 interview questions" subtitle={`Most commonly asked for ${role} at ${company}`} count="20 questions" defaultOpen>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 16 }}>
-          {(data.topQuestions || []).map((q, i) => {
-            const cat = CAT[q.category] || CAT.Other;
-            return (
-              <div key={i} style={{
-                display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
-                borderRadius: 10, background: "#f8fafc", border: "1px solid #f1f5f9"
-              }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", minWidth: 22, paddingTop: 2, flexShrink: 0 }}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span style={{ flex: 1, fontSize: 13.5, color: "#1e293b", lineHeight: 1.6 }}>{q.question}</span>
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6, flexShrink: 0, marginTop: 2,
-                  background: cat.bg, border: `1px solid ${cat.border}`, color: cat.color
-                }}>{q.category}</span>
-              </div>
-            );
-          })}
-        </div>
-      </Accordion>
-
-      <Accordion title="2-week preparation plan" subtitle="Day-by-day study roadmap">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 16 }}>
-          {(data.preparationPlan || []).map((wk, i) => (
-            <div key={i} style={{ borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "18px 20px" }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#4f46e5", marginBottom: 4 }}>
-                Week {wk.week}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 14 }}>{wk.focus}</div>
-              {(wk.tasks || []).map((task, j) => (
-                <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 9 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4f46e5", marginTop: 7, flexShrink: 0, opacity: 0.5 }} />
-                  <span style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.55 }}>{task}</span>
+        {/* Questions - Main Bottom Center/Right */}
+        <div className="bento-card bento-questions">
+          <div className="card-header-row">
+            <div className="card-label">Top Interview Questions</div>
+            <span className="count-badge">{(data.topQuestions || []).length} Items</span>
+          </div>
+          <div className="questions-grid">
+            {(data.topQuestions || []).map((q, i) => {
+              const cat = CAT_COLORS[q.category] || CAT_COLORS.Other;
+              return (
+                <div className="question-row" key={i}>
+                  <span className="q-number">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="q-body">
+                    <p className="q-text">{q.question}</p>
+                    <span className="q-tag" style={{ background: cat.bg, border: `1px solid ${cat.border}`, color: cat.text }}>{q.category}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
-      </Accordion>
 
-      <Accordion title="Full detailed analysis" subtitle="Complete breakdown — expand for depth">
-        <div style={{ paddingTop: 16, fontSize: 13.5, color: "#475569", lineHeight: 1.8 }} className="md-body">
-          <ReactMarkdown>{data.fullAnalysis || ""}</ReactMarkdown>
+        {/* Plan - Side */}
+        <div className="bento-card bento-plan">
+          <div className="card-label">14-Day Preparation Plan</div>
+          <div className="plan-timeline">
+            {(data.preparationPlan || []).map((week, i) => (
+              <div className="plan-week-box" key={i}>
+                <div className="week-label">Week {week.week}: {week.focus}</div>
+                <ul className="week-tasks">
+                  {(week.tasks || []).map((task, j) => (
+                    <li key={j}>{task}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
-      </Accordion>
 
+        {/* Full Analysis - Bottom span */}
+        <div className="bento-card bento-analysis">
+          <div className="card-label">Deep Dive Analysis</div>
+          <div className="analysis-markdown">
+            <ReactMarkdown>{data.fullAnalysis || ""}</ReactMarkdown>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
 
-const secLabel = {
-  fontSize: 10.5, fontWeight: 700, letterSpacing: "0.09em",
-  textTransform: "uppercase", color: "#94a3b8", marginBottom: 18,
-};
-
-/* ════════════════════════════════ */
-
+/* ══════════════════════════════════════════════════
+   MAIN APP
+══════════════════════════════════════════════════ */
 export default function App() {
   const [company, setCompany]       = useState("");
   const [role, setRole]             = useState("");
@@ -247,14 +204,7 @@ export default function App() {
   const [guide, setGuide]           = useState(null);
   const [loading, setLoading]       = useState(false);
   const [session, setSession]       = useState(undefined);
-  const [msgIdx, setMsgIdx]         = useState(0);
-
-  const MSGS = [
-    "Searching real interview experiences…",
-    "Analysing patterns from candidates…",
-    "Generating your personalised guide…",
-    "Almost there, putting it together…",
-  ];
+  const [dots, setDots]             = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -264,14 +214,19 @@ export default function App() {
 
   useEffect(() => {
     if (!loading) return;
-    const t = setInterval(() => setMsgIdx(m => (m + 1) % MSGS.length), 2800);
+    const t = setInterval(() => setDots(d => (d + 1) % 4), 500);
     return () => clearInterval(t);
   }, [loading]);
 
-  const generate = async () => {
-    setLoading(true); setGuide(null);
-    try { const raw = await generateInterviewGuide(company, role, experience); setGuide(raw); }
-    catch { setGuide("Something went wrong. Please try again."); }
+  const generateGuide = async () => {
+    setLoading(true);
+    setGuide(null);
+    try {
+      const raw = await generateInterviewGuide(company, role, experience);
+      setGuide(raw);
+    } catch {
+      setGuide("Something went wrong. Please try again.");
+    }
     setLoading(false);
   };
 
@@ -279,113 +234,78 @@ export default function App() {
 
   if (session === undefined) return (
     <>
-      <style>{`body{margin:0;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#94a3b8;font-size:13px;}`}</style>
+      <style>{`body{margin:0;background:#ffffff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;color:#64748b;font-size:14px;}`}</style>
       <div>Loading…</div>
     </>
   );
+
   if (!session) return <Login />;
 
   return (
     <>
       <style>{CSS}</style>
-      <div className="root">
+      <div className="app-container">
 
-        {/* SIDEBAR */}
-        <aside className="sidebar">
-          <div className="sidebar-top">
-            <div className="logo">
-              <span className="logo-mark">P</span>
-              PrepAI
-              <span className="badge">Beta</span>
+        {/* NAVBAR */}
+        <nav className="navbar">
+          <div className="nav-content">
+            <div className="logo">Interview<span>Prep</span></div>
+            <div className="nav-actions">
+              <span className="user-email">{session.user.email}</span>
+              <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Sign Out</button>
             </div>
-
-            <div className="divider" />
-
-            <p className="sidebar-eyebrow">Your target role</p>
-
-            <div className="field">
-              <label className="field-label">Company</label>
-              <input className="inp" type="text" placeholder="Google, Razorpay, Stripe…"
-                value={company} onChange={e => setCompany(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">Role</label>
-              <input className="inp" type="text" placeholder="Senior Software Engineer…"
-                value={role} onChange={e => setRole(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">Years of experience</label>
-              <input className="inp" type="number" min="0" placeholder="e.g. 4"
-                value={experience} onChange={e => setExperience(e.target.value)} />
-            </div>
-
-            <button className="btn-gen" onClick={generate} disabled={loading || !canGenerate}>
-              {loading
-                ? <><span className="spinner" /> Generating…</>
-                : "Generate my guide →"
-              }
-            </button>
-
-            {!canGenerate && !loading && (
-              <p style={{ fontSize: 12, color: "#94a3b8", textAlign: "center" }}>Fill all fields to continue</p>
-            )}
           </div>
+        </nav>
 
-          <div className="sidebar-bottom">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div className="avatar">{(session.user.email || "U")[0].toUpperCase()}</div>
-              <div style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
-                {session.user.email}
+        <main className="main-content">
+          {!guide && !loading ? (
+            <div className="hero-section">
+              <div className="hero-text">
+                <div className="ai-badge"><SparkleIcon /> AI-Driven Mastery</div>
+                <h1 className="hero-heading">Master your next <span>technical interview</span></h1>
+                <p className="hero-subheading">Get a data-backed preparation roadmap tailored to your target company and seniority.</p>
               </div>
-            </div>
-            <button className="btn-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>
-          </div>
-        </aside>
 
-        {/* MAIN */}
-        <main className="content">
-
-          {!loading && !guide && (
-            <div className="empty">
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#4f46e5", marginBottom: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                AI-powered interview prep
+              <div className="hero-form">
+                <div className="form-grid">
+                  <div className="input-group">
+                    <label>Target Company</label>
+                    <input type="text" placeholder="e.g. Google, Stripe" value={company} onChange={e => setCompany(e.target.value)} />
+                  </div>
+                  <div className="input-group">
+                    <label>Target Role</label>
+                    <input type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} />
+                  </div>
+                  <div className="input-group">
+                    <label>Years of Experience</label>
+                    <input type="number" placeholder="e.g. 5" value={experience} onChange={e => setExperience(e.target.value)} />
+                  </div>
+                </div>
+                <button className="btn-generate-main" onClick={generateGuide} disabled={!canGenerate}>
+                  Generate My Guide
+                </button>
               </div>
-              <h2 style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.025em", marginBottom: 10 }}>
-                Your personalized guide<br />starts here
-              </h2>
-              <p style={{ fontSize: 14, color: "#64748b", lineHeight: 1.7, maxWidth: 400, marginBottom: 36 }}>
-                Enter a company and role to get a complete interview guide — difficulty score, top questions, prep plan, and real candidate insights.
-              </p>
-              <div className="preview-grid">
+
+              <div className="hero-features">
                 {[
-                  { icon: "📊", t: "Difficulty score", d: "Calibrated from real data" },
-                  { icon: "❓", t: "Top 20 questions", d: "By category & topic" },
-                  { icon: "📅", t: "2-week plan", d: "Structured daily roadmap" },
-                  { icon: "💡", t: "Candidate insights", d: "Tips that got people hired" },
-                ].map((c, i) => (
-                  <div className="preview-card" key={i}>
-                    <span style={{ fontSize: 22 }}>{c.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 2 }}>{c.t}</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8" }}>{c.d}</div>
-                    </div>
+                  { icon: "🔍", text: "Real-time web search" },
+                  { icon: "🧠", text: "Gemini 2.5 Intelligence" },
+                  { icon: "📅", text: "14-day structured plan" }
+                ].map((f, i) => (
+                  <div className="feature-pill" key={i}>
+                    <span>{f.icon}</span> {f.text}
                   </div>
                 ))}
               </div>
             </div>
-          )}
-
-          {loading && (
-            <div className="loading-wrap">
-              <div className="loading-ring" />
-              <div style={{ fontSize: 15, fontWeight: 500, color: "#334155" }}>{MSGS[msgIdx]}</div>
-              <div style={{ fontSize: 13, color: "#94a3b8" }}>This usually takes 10–15 seconds</div>
-              <div className="loading-bar"><div className="loading-fill" /></div>
+          ) : loading ? (
+            <div className="loading-container">
+              <div className="loading-spinner" />
+              <h2 className="loading-title">Crafting your roadmap<span>{"·".repeat(dots)}</span></h2>
+              <p className="loading-subtitle">Analyzing {company}'s interview patterns for {role} positions...</p>
             </div>
-          )}
-
-          {guide && !loading && (
-            <ResultsView guide={guide} company={company} role={role} experience={experience} />
+          ) : (
+            <ResultsPanel guide={guide} company={company} role={role} experience={experience} />
           )}
         </main>
       </div>
@@ -393,103 +313,217 @@ export default function App() {
   );
 }
 
+/* ══════════════════════════════════════════════════
+   CSS - CLEAN MINIMALIST LIGHT MODE
+══════════════════════════════════════════════════ */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 
 :root {
-  --sans: 'Inter', system-ui, sans-serif;
+  --bg: #ffffff;
+  --bg-subtle: #f8fafc;
+  --surf: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --sans: 'Plus Jakarta Sans', sans-serif;
+  --serif: 'Instrument Serif', serif;
 }
 
-body { background: #f1f5f9; font-family: var(--sans); color: #1e293b; -webkit-font-smoothing: antialiased; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.root { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
-
-/* ── SIDEBAR ── */
-.sidebar {
-  background: #fff;
-  border-right: 1px solid #e2e8f0;
-  display: flex; flex-direction: column; justify-content: space-between;
-  position: sticky; top: 0; height: 100vh; overflow-y: auto;
-  padding: 28px 22px;
-  box-shadow: 1px 0 0 #f1f5f9;
+body { 
+  background: var(--bg); 
+  color: var(--text); 
+  font-family: var(--sans); 
+  line-height: 1.6; 
+  -webkit-font-smoothing: antialiased; 
 }
-.sidebar-top { display: flex; flex-direction: column; gap: 14px; }
 
-.logo {
-  display: flex; align-items: center; gap: 9px;
-  font-size: 16px; font-weight: 700; color: #0f172a;
-  letter-spacing: -0.02em; margin-bottom: 4px;
+/* ── LAYOUT ── */
+.app-container { min-height: 100vh; display: flex; flex-direction: column; }
+.navbar { 
+  height: 64px; 
+  border-bottom: 1px solid var(--border); 
+  background: rgba(255,255,255,0.8); 
+  backdrop-filter: blur(12px); 
+  position: sticky; top: 0; z-index: 100;
 }
-.logo-mark {
-  width: 28px; height: 28px; border-radius: 7px;
-  background: #4f46e5; color: #fff; font-size: 14px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
+.nav-content { 
+  max-width: 1280px; margin: 0 auto; height: 100%; 
+  display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
 }
-.badge {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
-  background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe;
-  border-radius: 20px; padding: 2px 8px;
+.logo { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.logo span { color: var(--accent); }
+.nav-actions { display: flex; align-items: center; gap: 16px; }
+.user-email { font-size: 13px; color: var(--text-muted); }
+.btn-logout { 
+  font-size: 12px; font-weight: 600; padding: 6px 12px; 
+  border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer;
 }
-.divider { height: 1px; background: #f1f5f9; }
-.sidebar-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8; }
 
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 12px; font-weight: 500; color: #64748b; }
-.inp {
-  width: 100%; padding: 9px 12px; background: #f8fafc;
-  border: 1px solid #e2e8f0; border-radius: 8px;
-  color: #0f172a; font-size: 13px; font-family: var(--sans);
-  outline: none; transition: border-color .15s, box-shadow .15s;
+.main-content { flex: 1; max-width: 1280px; margin: 0 auto; width: 100%; padding: 40px 24px; }
+
+/* ── HERO SECTION ── */
+.hero-section { max-width: 800px; margin: 60px auto 0; text-align: center; }
+.ai-badge { 
+  display: inline-flex; align-items: center; gap: 8px; 
+  background: var(--accent-soft); color: var(--accent); 
+  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 700; margin-bottom: 24px;
 }
-.inp::placeholder { color: #cbd5e1; }
-.inp:focus { background: #fff; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.08); }
-
-.btn-gen {
-  width: 100%; padding: 11px 16px; background: #4f46e5; color: #fff;
-  border: none; border-radius: 9px; font-size: 13.5px; font-weight: 600;
-  font-family: var(--sans); cursor: pointer; display: flex;
-  align-items: center; justify-content: center; gap: 8px;
-  transition: background .15s; margin-top: 4px;
-  box-shadow: 0 1px 3px rgba(79,70,229,0.3);
+.hero-heading { 
+  font-size: 56px; line-height: 1.1; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; 
 }
-.btn-gen:hover:not(:disabled) { background: #4338ca; }
-.btn-gen:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
-.spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.hero-heading span { color: var(--accent); }
+.hero-subheading { font-size: 18px; color: var(--text-muted); margin-bottom: 48px; max-width: 600px; margin-inline: auto; }
 
-.sidebar-bottom { display: flex; flex-direction: column; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; background: #eef2ff; border: 1px solid #c7d2fe; color: #4f46e5; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.btn-signout { font-size: 12px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: var(--sans); width: 100%; transition: background .15s; }
-.btn-signout:hover { background: #f1f5f9; }
+.hero-form { 
+  background: var(--surf); border: 1px solid var(--border); border-radius: 24px; 
+  padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); margin-bottom: 40px;
+}
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: left; margin-bottom: 24px; }
+.input-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+.input-group input { 
+  width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; 
+  font-family: var(--sans); font-size: 14px; outline: none; transition: border-color 0.2s;
+}
+.input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.btn-generate-main { 
+  width: 100%; padding: 14px; background: var(--accent); color: white; border: none; 
+  border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.1s;
+}
+.btn-generate-main:active { transform: scale(0.99); }
+.btn-generate-main:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── CONTENT ── */
-.content { padding: 52px 64px; max-width: 920px; width: 100%; }
-
-/* ── EMPTY ── */
-.empty { padding-top: 24px; }
-.preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 460px; }
-.preview-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+.hero-features { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+.feature-pill { 
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; 
+  color: var(--text-muted); padding: 8px 16px; border: 1px solid var(--border); border-radius: 100px;
+}
 
 /* ── LOADING ── */
-.loading-wrap { padding-top: 80px; display: flex; flex-direction: column; gap: 16px; }
-.loading-ring { width: 34px; height: 34px; border: 2.5px solid #e2e8f0; border-top-color: #4f46e5; border-radius: 50%; animation: spin .9s linear infinite; }
-.loading-bar { width: 200px; height: 3px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-.loading-fill { height: 100%; width: 40%; background: #4f46e5; border-radius: 4px; animation: slide 1.6s ease-in-out infinite; }
-@keyframes slide { 0% { transform: translateX(-200%); } 100% { transform: translateX(450%); } }
+.loading-container { text-align: center; padding-top: 100px; }
+.loading-spinner { 
+  width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--accent); 
+  border-radius: 50%; margin: 0 auto 24px; animation: spin 0.8s linear infinite;
+}
+.loading-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.loading-subtitle { color: var(--text-muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── MARKDOWN ── */
-.md-body p { margin-bottom: 12px; }
-.md-body h2, .md-body h3 { font-size: 14px; font-weight: 600; color: #0f172a; margin: 16px 0 8px; }
-.md-body ul, .md-body ol { padding-left: 18px; margin-bottom: 12px; }
-.md-body li { font-size: 13px; color: #475569; line-height: 1.65; margin-bottom: 4px; }
-.md-body strong { color: #0f172a; font-weight: 600; }
+/* ── RESULTS ── */
+.results-root { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ── RESPONSIVE ── */
-@media (max-width: 860px) {
-  .root { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid #e2e8f0; }
-  .content { padding: 28px 18px; }
-  .preview-grid { grid-template-columns: 1fr; }
+.results-header { 
+  display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; 
+}
+.results-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
+.results-title span { color: var(--accent); }
+.results-subtitle { color: var(--text-muted); font-size: 15px; margin-top: 4px; }
+.results-badge { 
+  display: flex; align-items: center; gap: 8px; background: #f0fdf4; color: #166534; 
+  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 700; border: 1px solid #bbf7d0;
+}
+.tag-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+
+/* ── BENTO GRID ── */
+.bento-grid { 
+  display: grid; 
+  grid-template-columns: repeat(12, 1fr); 
+  grid-auto-rows: minmax(100px, auto); 
+  gap: 20px; 
+}
+
+.bento-card { 
+  background: var(--surf); border: 1px solid var(--border); border-radius: 24px; 
+  padding: 24px; transition: box-shadow 0.2s;
+}
+.bento-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+
+.card-label { 
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; 
+  color: var(--text-dim); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Specific Bento Areas */
+.bento-difficulty { grid-column: span 4; }
+.bento-insights   { grid-column: span 4; }
+.bento-rounds     { grid-column: span 5; }
+.bento-topics     { grid-column: span 3; }
+.bento-questions  { grid-column: span 8; }
+.bento-plan       { grid-column: span 4; grid-row: span 2; }
+.bento-analysis   { grid-column: span 12; }
+
+/* Difficulty Card */
+.difficulty-content { display: flex; align-items: center; gap: 20px; }
+.score-ring-wrap { 
+  position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;
+}
+.score-ring-inner { position: absolute; text-align: center; }
+.score-number { font-size: 20px; font-weight: 800; display: block; }
+.score-of { font-size: 10px; color: var(--text-dim); }
+.difficulty-level { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.difficulty-reason { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+
+/* Insights List */
+.insights-list { display: flex; flex-direction: column; gap: 12px; }
+.insight-item { display: flex; gap: 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.insight-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; margin-top: 8px; flex-shrink: 0; }
+
+/* Rounds Scroll */
+.rounds-scroll { display: flex; flex-direction: column; gap: 16px; }
+.round-item { display: flex; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--bg-subtle); }
+.round-item:last-child { border-bottom: none; }
+.round-num { 
+  width: 24px; height: 24px; background: var(--bg-subtle); border-radius: 6px; 
+  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;
+}
+.round-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.round-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.round-dur { font-size: 11px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+
+/* Topics Wrap */
+.topics-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.topic-chip { 
+  font-size: 12px; font-weight: 600; padding: 6px 12px; 
+  background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px;
+}
+
+/* Questions Grid */
+.questions-grid { display: flex; flex-direction: column; gap: 12px; }
+.question-row { 
+  display: flex; gap: 16px; padding: 16px; border: 1px solid var(--bg-subtle); 
+  border-radius: 16px; transition: border-color 0.2s;
+}
+.question-row:hover { border-color: var(--border); background: var(--bg-subtle); }
+.q-number { font-size: 14px; font-weight: 800; color: var(--text-dim); }
+.q-text { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.q-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+
+/* Plan Timeline */
+.plan-timeline { display: flex; flex-direction: column; gap: 24px; }
+.plan-week-box { position: relative; padding-left: 20px; border-left: 2px solid var(--accent-soft); }
+.week-label { font-weight: 700; font-size: 14px; margin-bottom: 12px; color: var(--accent); }
+.week-tasks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.week-tasks li { font-size: 13px; color: var(--text-muted); position: relative; padding-left: 16px; }
+.week-tasks li::before { 
+  content: "•"; position: absolute; left: 0; color: var(--text-dim); 
+}
+
+/* Analysis Markdown */
+.analysis-markdown { font-size: 15px; color: var(--text-muted); }
+.analysis-markdown h1, .analysis-markdown h2 { font-size: 18px; color: var(--text); margin: 24px 0 12px; }
+.analysis-markdown p { margin-bottom: 16px; }
+.analysis-markdown li { margin-bottom: 8px; }
+
+/* Mobile Adaptations */
+@media (max-width: 1024px) {
+  .bento-difficulty, .bento-insights, .bento-rounds, .bento-topics, .bento-questions, .bento-plan { grid-column: span 12; }
+  .form-grid { grid-template-columns: 1fr; }
+  .hero-heading { font-size: 40px; }
 }
 `;

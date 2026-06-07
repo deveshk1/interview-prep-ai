@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { company, role, experience } = await req.json();
+    const { company, role } = await req.json();
 
     const tavilyKey = Deno.env.get("TAVILY_API_KEY");
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
@@ -65,7 +65,6 @@ You are an expert interview coach. Based on the search results below, generate a
 
 Company: ${company}
 Role: ${role}
-Candidate Experience: ${experience} years
 
 Search context:
 ${searchContext}
@@ -74,7 +73,7 @@ Return ONLY valid JSON (no markdown, no explanation) matching this exact structu
 {
   "difficultyScore": <number 1-10>,
   "difficultyLabel": <"Easy"|"Medium"|"Hard"|"Very Hard">,
-  "difficultyReason": "<one sentence why, considering the ${experience} years of experience>",
+  "difficultyReason": "<one sentence why>",
   "interviewRounds": [
     { "name": "<round name>", "description": "<what happens>", "duration": "<e.g. 45 min>" }
   ],
@@ -83,15 +82,14 @@ Return ONLY valid JSON (no markdown, no explanation) matching this exact structu
     { "question": "<question text>", "category": "<DSA|System Design|Java|Spring|Behavioral|Other>" }
   ],
   "preparationPlan": [
-    { "week": 1, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] },
-    { "week": 2, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] }
+    { "week": 1, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] }
   ],
   "keyInsights": ["<insight1>", "<insight2>", ...],
-  "fullAnalysis": "<detailed 300-500 word markdown analysis tailored for a candidate with ${experience} years of experience>"
+  "fullAnalysis": "<detailed 300-500 word markdown analysis>"
 }
 
 Rules:
-- topQuestions: exactly 20 items. For ${experience} years of experience, ensure the difficulty and depth are appropriate.
+- topQuestions: exactly 20 items
 - preparationPlan: exactly 2 weeks (week 1 and week 2, each with 5-7 tasks)
 - keyInsights: 5-7 bullet insights
 - topTopics: 8-12 topics
