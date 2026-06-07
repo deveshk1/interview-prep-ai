@@ -61,22 +61,27 @@ ${item.url}
       .join("\n\n");
 
 const prompt = `
-You are an expert interview coach. Based on the search results below, generate a structured JSON object.
+You are an ELITE Silicon Valley Interview Coach. Your goal is to provide a surgical, actionable preparation guide for a candidate.
 
+TARGET CONTEXT:
 Company: ${company}
 Role: ${role}
-Candidate Experience: ${experience} years
+Candidate Seniority: ${experience} years of experience
 
-Search context:
-${searchContext}
+CRITICAL INSTRUCTIONS:
+1. NO long paragraphs. NO generic "filler" text or fluff.
+2. Every sentence must provide high-signal, actionable value.
+3. Tailor the depth of topics and technical questions strictly to someone with ${experience} years of experience.
+4. Maintain a professional, elite, and encouraging tone.
+5. Use bullet points for tasks and insights.
 
-Return ONLY valid JSON (no markdown, no explanation) matching this exact structure:
+Return ONLY a valid JSON object (no markdown, no preamble) with this exact structure:
 {
   "difficultyScore": <number 1-10>,
   "difficultyLabel": <"Easy"|"Medium"|"Hard"|"Very Hard">,
-  "difficultyReason": "<one sentence why, considering the ${experience} years of experience>",
+  "difficultyReason": "<ONE punchy sentence explaining why for a candidate with ${experience} years exp>",
   "interviewRounds": [
-    { "name": "<round name>", "description": "<what happens>", "duration": "<e.g. 45 min>" }
+    { "name": "<round name>", "description": "<actionable summary>", "duration": "<e.g. 45 min>" }
   ],
   "topTopics": ["<topic1>", "<topic2>", ...],
   "topQuestions": [
@@ -86,17 +91,23 @@ Return ONLY valid JSON (no markdown, no explanation) matching this exact structu
     { "week": 1, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] },
     { "week": 2, "focus": "<focus area>", "tasks": ["<task1>", "<task2>"] }
   ],
-  "keyInsights": ["<insight1>", "<insight2>", ...],
-  "fullAnalysis": "<detailed 300-500 word markdown analysis tailored for a candidate with ${experience} years of experience>"
+  "keyInsights": ["<punchy insight 1>", "<punchy insight 2>", ...],
+  "strategicBriefing": [
+    { 
+      "title": "<module title>", 
+      "type": "<insight|warning|strategy>", 
+      "points": ["<actionable point 1>", "<actionable point 2>", ...] 
+    }
+  ]
 }
 
 Rules:
-- topQuestions: exactly 20 items. For ${experience} years of experience, ensure the difficulty and depth are appropriate.
-- preparationPlan: exactly 2 weeks (week 1 and week 2, each with 5-7 tasks)
-- keyInsights: 5-7 bullet insights
-- topTopics: 8-12 topics
-- interviewRounds: 3-6 rounds
-- Return ONLY the JSON object, no other text
+- topQuestions: exactly 20 items.
+- preparationPlan: exactly 2 weeks.
+- keyInsights: exactly 5-7 bullet points.
+- interviewRounds: 3-6 rounds.
+- strategicBriefing: 4-6 modular sections. DO NOT return a single long text block.
+- Return ONLY the JSON object.
 `;
 
     const geminiResponse = await fetch(

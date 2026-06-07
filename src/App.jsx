@@ -65,6 +65,7 @@ function parseGuide(raw) {
 /* ─── Results Panel ─── */
 function ResultsPanel({ guide, company, role, experience }) {
   const data = parseGuide(guide);
+  const [activeTab, setActiveTab] = useState("overview");
 
   if (!data || !data.difficultyScore) {
     return (
@@ -76,120 +77,183 @@ function ResultsPanel({ guide, company, role, experience }) {
 
   const col = diffColor(data.difficultyScore);
 
+  const TABS = [
+    { id: "overview", label: "Overview", icon: "📊" },
+    { id: "rounds", label: "Interview Process", icon: "🔄" },
+    { id: "questions", label: "Top 20 Questions", icon: "❓" },
+    { id: "plan", label: "14-Day Study Plan", icon: "📅" },
+    { id: "analysis", label: "Deep Dive Analysis", icon: "📄" },
+  ];
+
   return (
-    <div className="results-root">
-      <div className="results-header">
-        <div className="results-title-group">
-          <h2 className="results-title">{company} <span>{role}</span></h2>
-          <p className="results-subtitle">Personalized Interview Roadmap · {experience} Year{experience !== "1" ? "s" : ""} Experience</p>
-        </div>
-        <div className="results-badge">
-          <span className="tag-dot" />
-          Analysis Complete
-        </div>
-      </div>
-
-      <div className="bento-grid">
-        {/* Difficulty - Top Left */}
-        <div className="bento-card bento-difficulty">
-          <div className="card-label">Difficulty Score</div>
-          <div className="difficulty-content">
-            <CircularScore score={data.difficultyScore} />
-            <div className="difficulty-meta">
-              <div className="difficulty-level" style={{ color: col.text }}>{data.difficultyLabel}</div>
-              <div className="difficulty-reason">{data.difficultyReason}</div>
-            </div>
+    <div className="results-container">
+      {/* SIDEBAR NAVIGATION */}
+      <aside className="results-sidebar">
+        <div className="sidebar-meta">
+          <div className="results-badge">
+            <span className="tag-dot" />
+            AI Roadmap Ready
           </div>
+          <h3 className="sidebar-company">{company}</h3>
+          <p className="sidebar-role">{role}</p>
         </div>
+        
+        <nav className="sidebar-nav">
+          {TABS.map(tab => (
+            <button 
+              key={tab.id}
+              className={`nav-btn ${activeTab === tab.id ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="nav-icon">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
-        {/* Key Insights - Bottom Left */}
-        <div className="bento-card bento-insights">
-          <div className="card-label">💡 Key Insights</div>
-          <div className="insights-list">
-            {(data.keyInsights || []).map((ins, i) => (
-              <div className="insight-item" key={i}>
-                <span className="insight-dot" />
-                <span>{ins}</span>
-              </div>
-            ))}
-          </div>
+        <div className="sidebar-footer">
+          <p>Targeting {experience} Year{experience !== "1" ? "s" : ""} Experience</p>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="results-main">
+        <div className="view-header">
+          <h2 className="view-title">{TABS.find(t => t.id === activeTab).label}</h2>
         </div>
 
-        {/* Interview Rounds - Top Center */}
-        <div className="bento-card bento-rounds">
-          <div className="card-label">Interview Process</div>
-          <div className="rounds-scroll">
-            {(data.interviewRounds || []).map((r, i) => (
-              <div className="round-item" key={i}>
-                <div className="round-num">{i + 1}</div>
-                <div className="round-info">
-                  <div className="round-name">{r.name}</div>
-                  <div className="round-desc">{r.description}</div>
-                  {r.duration && <div className="round-dur">Duration: {r.duration}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Topics - Top Right */}
-        <div className="bento-card bento-topics">
-          <div className="card-label">Core Topics</div>
-          <div className="topics-wrap">
-            {(data.topTopics || []).map((t, i) => (
-              <span className="topic-chip" key={i}>{t}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Questions - Main Bottom Center/Right */}
-        <div className="bento-card bento-questions">
-          <div className="card-header-row">
-            <div className="card-label">Top Interview Questions</div>
-            <span className="count-badge">{(data.topQuestions || []).length} Items</span>
-          </div>
-          <div className="questions-grid">
-            {(data.topQuestions || []).map((q, i) => {
-              const cat = CAT_COLORS[q.category] || CAT_COLORS.Other;
-              return (
-                <div className="question-row" key={i}>
-                  <span className="q-number">{String(i + 1).padStart(2, '0')}</span>
-                  <div className="q-body">
-                    <p className="q-text">{q.question}</p>
-                    <span className="q-tag" style={{ background: cat.bg, border: `1px solid ${cat.border}`, color: cat.text }}>{q.category}</span>
+        <div className="view-content">
+          {activeTab === "overview" && (
+            <div className="view-fade-in">
+              <div className="overview-grid">
+                <div className="overview-card">
+                  <div className="card-label">Interview Difficulty</div>
+                  <div className="difficulty-content">
+                    <CircularScore score={data.difficultyScore} />
+                    <div className="difficulty-meta">
+                      <div className="difficulty-level" style={{ color: col.text }}>{data.difficultyLabel}</div>
+                      <div className="difficulty-reason">{data.difficultyReason}</div>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Plan - Side */}
-        <div className="bento-card bento-plan">
-          <div className="card-label">14-Day Preparation Plan</div>
-          <div className="plan-timeline">
-            {(data.preparationPlan || []).map((week, i) => (
-              <div className="plan-week-box" key={i}>
-                <div className="week-label">Week {week.week}: {week.focus}</div>
-                <ul className="week-tasks">
-                  {(week.tasks || []).map((task, j) => (
-                    <li key={j}>{task}</li>
-                  ))}
-                </ul>
+                <div className="overview-card">
+                  <div className="card-label">Key Strategy Insights</div>
+                  <div className="insights-list">
+                    {(data.keyInsights || []).map((ins, i) => (
+                      <div className="insight-item" key={i}>
+                        <span className="insight-dot" />
+                        <span>{ins}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overview-card full-width">
+                  <div className="card-label">Core Technical Topics</div>
+                  <div className="topics-wrap">
+                    {(data.topTopics || []).map((t, i) => (
+                      <span className="topic-chip" key={i}>{t}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          )}
 
-        {/* Full Analysis - Bottom span */}
-        <div className="bento-card bento-analysis">
-          <div className="card-label">Deep Dive Analysis</div>
-          <div className="analysis-markdown">
-            <ReactMarkdown>{data.fullAnalysis || ""}</ReactMarkdown>
-          </div>
-        </div>
+          {activeTab === "rounds" && (
+            <div className="view-fade-in">
+              <div className="rounds-list-vertical">
+                {(data.interviewRounds || []).map((r, i) => (
+                  <div className="round-card-wide" key={i}>
+                    <div className="round-number-pill">Round {i + 1}</div>
+                    <div className="round-details">
+                      <h4 className="round-title">{r.name}</h4>
+                      <p className="round-description">{r.description}</p>
+                      {r.duration && <span className="round-time">⏱ Expected Duration: {r.duration}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-      </div>
+          {activeTab === "questions" && (
+            <div className="view-fade-in">
+              <div className="questions-spacious-list">
+                {(data.topQuestions || []).map((q, i) => {
+                  const cat = CAT_COLORS[q.category] || CAT_COLORS.Other;
+                  return (
+                    <div className="q-card-wide" key={i}>
+                      <span className="q-index">{String(i + 1).padStart(2, '0')}</span>
+                      <div className="q-main">
+                        <p className="q-text-primary">{q.question}</p>
+                        <span className="q-category-tag" style={{ background: cat.bg, border: `1px solid ${cat.border}`, color: cat.text }}>
+                          {q.category}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "plan" && (
+            <div className="view-fade-in">
+              <div className="plan-timeline-vertical">
+                {(data.preparationPlan || []).map((week, i) => (
+                  <div className="plan-week-section" key={i}>
+                    <div className="week-header-row">
+                      <h3 className="week-number">Week {week.week}</h3>
+                      <span className="week-focus-tag">{week.focus}</span>
+                    </div>
+                    <div className="week-tasks-grid">
+                      {(week.tasks || []).map((task, j) => (
+                        <div key={j} className="task-item-card">
+                          <div className="task-check" />
+                          <p>{task}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "analysis" && (
+            <div className="view-fade-in">
+              <div className="briefing-grid">
+                {(data.strategicBriefing || []).map((brief, i) => (
+                  <div className={`brief-card ${brief.type}`} key={i}>
+                    <div className="brief-header">
+                      <span className="brief-type-icon">
+                        {brief.type === 'insight' ? '💡' : brief.type === 'warning' ? '⚠️' : '🎯'}
+                      </span>
+                      <h4 className="brief-title">{brief.title}</h4>
+                    </div>
+                    <ul className="brief-points">
+                      {(brief.points || []).map((p, j) => (
+                        <li key={j} className="brief-point">
+                          <span className="brief-dot" />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {/* Fallback for older guides */}
+                {!data.strategicBriefing && data.fullAnalysis && (
+                  <div className="analysis-rich-view">
+                    <ReactMarkdown>{data.fullAnalysis}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
@@ -249,7 +313,9 @@ export default function App() {
         {/* NAVBAR */}
         <nav className="navbar">
           <div className="nav-content">
-            <div className="logo">Interview<span>Prep</span></div>
+            <div className="logo" onClick={() => setGuide(null)} style={{ cursor: "pointer" }}>
+              Interview<span>Prep</span>
+            </div>
             <div className="nav-actions">
               <span className="user-email">{session.user.email}</span>
               <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Sign Out</button>
@@ -314,10 +380,10 @@ export default function App() {
 }
 
 /* ══════════════════════════════════════════════════
-   CSS - CLEAN MINIMALIST LIGHT MODE
+   CSS - DASHBOARD ARCHITECTURE
 ══════════════════════════════════════════════════ */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
 
 :root {
   --bg: #ffffff;
@@ -330,33 +396,27 @@ const CSS = `
   --accent: #2563eb;
   --accent-soft: #eff6ff;
   --sans: 'Plus Jakarta Sans', sans-serif;
-  --serif: 'Instrument Serif', serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body { 
-  background: var(--bg); 
-  color: var(--text); 
-  font-family: var(--sans); 
-  line-height: 1.6; 
-  -webkit-font-smoothing: antialiased; 
+  background: var(--bg); color: var(--text); font-family: var(--sans); 
+  line-height: 1.6; -webkit-font-smoothing: antialiased; 
 }
 
 /* ── LAYOUT ── */
 .app-container { min-height: 100vh; display: flex; flex-direction: column; }
 .navbar { 
-  height: 64px; 
-  border-bottom: 1px solid var(--border); 
-  background: rgba(255,255,255,0.8); 
-  backdrop-filter: blur(12px); 
+  height: 64px; border-bottom: 1px solid var(--border); 
+  background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); 
   position: sticky; top: 0; z-index: 100;
 }
 .nav-content { 
-  max-width: 1280px; margin: 0 auto; height: 100%; 
+  max-width: 1440px; margin: 0 auto; height: 100%; 
   display: flex; align-items: center; justify-content: space-between; padding: 0 24px;
 }
-.logo { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
 .logo span { color: var(--accent); }
 .nav-actions { display: flex; align-items: center; gap: 16px; }
 .user-email { font-size: 13px; color: var(--text-muted); }
@@ -365,165 +425,149 @@ body {
   border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer;
 }
 
-.main-content { flex: 1; max-width: 1280px; margin: 0 auto; width: 100%; padding: 40px 24px; }
-
-/* ── HERO SECTION ── */
-.hero-section { max-width: 800px; margin: 60px auto 0; text-align: center; }
+/* ── HERO ── */
+.main-content { flex: 1; width: 100%; display: flex; flex-direction: column; }
+.hero-section { max-width: 800px; margin: 100px auto; text-align: center; padding: 0 24px; }
 .ai-badge { 
   display: inline-flex; align-items: center; gap: 8px; 
   background: var(--accent-soft); color: var(--accent); 
   padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 700; margin-bottom: 24px;
 }
-.hero-heading { 
-  font-size: 56px; line-height: 1.1; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; 
-}
+.hero-heading { font-size: 56px; line-height: 1.1; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; }
 .hero-heading span { color: var(--accent); }
-.hero-subheading { font-size: 18px; color: var(--text-muted); margin-bottom: 48px; max-width: 600px; margin-inline: auto; }
-
-.hero-form { 
-  background: var(--surf); border: 1px solid var(--border); border-radius: 24px; 
-  padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); margin-bottom: 40px;
-}
+.hero-subheading { font-size: 18px; color: var(--text-muted); margin-bottom: 48px; }
+.hero-form { background: #fff; border: 1px solid var(--border); border-radius: 24px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05); }
 .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: left; margin-bottom: 24px; }
 .input-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
-.input-group input { 
-  width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; 
-  font-family: var(--sans); font-size: 14px; outline: none; transition: border-color 0.2s;
-}
-.input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-.btn-generate-main { 
-  width: 100%; padding: 14px; background: var(--accent); color: white; border: none; 
-  border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; transition: transform 0.1s;
-}
-.btn-generate-main:active { transform: scale(0.99); }
-.btn-generate-main:disabled { opacity: 0.5; cursor: not-allowed; }
+.input-group input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; outline: none; }
+.btn-generate-main { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; }
 
-.hero-features { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
-.feature-pill { 
-  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; 
-  color: var(--text-muted); padding: 8px 16px; border: 1px solid var(--border); border-radius: 100px;
-}
+/* ── RESULTS DASHBOARD ── */
+.results-container { display: flex; flex: 1; min-height: 0; }
 
-/* ── LOADING ── */
-.loading-container { text-align: center; padding-top: 100px; }
-.loading-spinner { 
-  width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--accent); 
-  border-radius: 50%; margin: 0 auto 24px; animation: spin 0.8s linear infinite;
+.results-sidebar { 
+  width: 280px; border-right: 1px solid var(--border); background: var(--bg-subtle); 
+  display: flex; flex-direction: column; padding: 32px 16px; position: sticky; top: 64px; height: calc(100vh - 64px);
 }
-.loading-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-.loading-subtitle { color: var(--text-muted); }
-@keyframes spin { to { transform: rotate(360deg); } }
+.sidebar-meta { padding: 0 12px 32px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.results-badge { 
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; 
+  color: #166534; background: #f0fdf4; padding: 4px 10px; border-radius: 100px; margin-bottom: 16px;
+}
+.tag-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; }
+.sidebar-company { font-size: 20px; font-weight: 800; color: var(--text); }
+.sidebar-role { font-size: 13px; color: var(--text-muted); }
 
-/* ── RESULTS ── */
-.results-root { animation: fadeIn 0.4s ease-out; }
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-btn { 
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; 
+  border: none; background: none; border-radius: 12px; cursor: pointer;
+  font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--text-muted);
+  transition: all 0.2s; text-align: left;
+}
+.nav-btn:hover { background: #f1f5f9; color: var(--text); }
+.nav-btn.active { background: #ffffff; color: var(--accent); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+.nav-icon { font-size: 16px; }
+
+.sidebar-footer { padding: 16px 12px; font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.results-main { flex: 1; background: #ffffff; overflow-y: auto; display: flex; flex-direction: column; }
+.view-header { padding: 32px 48px; border-bottom: 1px solid var(--bg-subtle); }
+.view-title { font-size: 24px; font-weight: 800; color: var(--text); }
+.view-content { padding: 48px; max-width: 1000px; width: 100%; }
+
+.view-fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-.results-header { 
-  display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; 
-}
-.results-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
-.results-title span { color: var(--accent); }
-.results-subtitle { color: var(--text-muted); font-size: 15px; margin-top: 4px; }
-.results-badge { 
-  display: flex; align-items: center; gap: 8px; background: #f0fdf4; color: #166534; 
-  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 700; border: 1px solid #bbf7d0;
-}
-.tag-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+/* ── OVERVIEW TAB ── */
+.overview-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.overview-card { background: #fff; border: 1px solid var(--border); border-radius: 24px; padding: 32px; }
+.overview-card.full-width { grid-column: span 2; }
+.card-label { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px; }
 
-/* ── BENTO GRID ── */
-.bento-grid { 
-  display: grid; 
-  grid-template-columns: repeat(12, 1fr); 
-  grid-auto-rows: minmax(100px, auto); 
-  gap: 20px; 
-}
-
-.bento-card { 
-  background: var(--surf); border: 1px solid var(--border); border-radius: 24px; 
-  padding: 24px; transition: box-shadow 0.2s;
-}
-.bento-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-
-.card-label { 
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; 
-  color: var(--text-dim); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
-}
-
-/* Specific Bento Areas */
-.bento-difficulty { grid-column: span 4; }
-.bento-insights   { grid-column: span 4; }
-.bento-rounds     { grid-column: span 5; }
-.bento-topics     { grid-column: span 3; }
-.bento-questions  { grid-column: span 8; }
-.bento-plan       { grid-column: span 4; grid-row: span 2; }
-.bento-analysis   { grid-column: span 12; }
-
-/* Difficulty Card */
-.difficulty-content { display: flex; align-items: center; gap: 20px; }
-.score-ring-wrap { 
-  position: relative; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;
-}
+.difficulty-content { display: flex; align-items: center; gap: 24px; }
+.score-ring-wrap { position: relative; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .score-ring-inner { position: absolute; text-align: center; }
-.score-number { font-size: 20px; font-weight: 800; display: block; }
-.score-of { font-size: 10px; color: var(--text-dim); }
-.difficulty-level { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
-.difficulty-reason { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+.score-number { font-size: 24px; font-weight: 800; display: block; }
+.score-of { font-size: 11px; color: var(--text-dim); }
+.difficulty-level { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.difficulty-reason { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
 
-/* Insights List */
-.insights-list { display: flex; flex-direction: column; gap: 12px; }
-.insight-item { display: flex; gap: 12px; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
-.insight-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; margin-top: 8px; flex-shrink: 0; }
+.insights-list { display: flex; flex-direction: column; gap: 14px; }
+.insight-item { display: flex; gap: 14px; font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+.insight-dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; margin-top: 9px; flex-shrink: 0; }
 
-/* Rounds Scroll */
-.rounds-scroll { display: flex; flex-direction: column; gap: 16px; }
-.round-item { display: flex; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--bg-subtle); }
-.round-item:last-child { border-bottom: none; }
-.round-num { 
-  width: 24px; height: 24px; background: var(--bg-subtle); border-radius: 6px; 
-  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;
+.topics-wrap { display: flex; flex-wrap: wrap; gap: 10px; }
+.topic-chip { font-size: 13px; font-weight: 600; padding: 8px 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 12px; }
+
+/* ── PROCESS TAB ── */
+.rounds-list-vertical { display: flex; flex-direction: column; gap: 20px; }
+.round-card-wide { display: flex; gap: 32px; padding: 32px; border: 1px solid var(--border); border-radius: 24px; background: #fff; }
+.round-number-pill { 
+  height: max-content; padding: 6px 16px; background: var(--accent-soft); color: var(--accent); 
+  border-radius: 100px; font-size: 12px; font-weight: 800; white-space: nowrap;
 }
-.round-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
-.round-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
-.round-dur { font-size: 11px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+.round-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+.round-description { font-size: 15px; color: var(--text-muted); margin-bottom: 12px; }
+.round-time { font-size: 12px; font-weight: 700; color: var(--text-dim); }
 
-/* Topics Wrap */
-.topics-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
-.topic-chip { 
-  font-size: 12px; font-weight: 600; padding: 6px 12px; 
-  background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px;
+/* ── QUESTIONS TAB ── */
+.questions-spacious-list { display: flex; flex-direction: column; gap: 16px; }
+.q-card-wide { display: flex; gap: 24px; padding: 24px 32px; border: 1px solid var(--border); border-radius: 20px; transition: all 0.2s; }
+.q-card-wide:hover { background: var(--bg-subtle); border-color: var(--accent); }
+.q-index { font-size: 18px; font-weight: 800; color: var(--text-dim); padding-top: 4px; }
+.q-text-primary { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+.q-category-tag { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 8px; text-transform: uppercase; }
+
+/* ── PLAN TAB ── */
+.plan-timeline-vertical { display: flex; flex-direction: column; gap: 48px; }
+.plan-week-section { position: relative; }
+.week-header-row { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.week-number { font-size: 24px; font-weight: 800; color: var(--accent); }
+.week-focus-tag { font-size: 14px; font-weight: 600; color: var(--text-muted); background: var(--bg-subtle); padding: 4px 14px; border-radius: 100px; }
+.week-tasks-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.task-item-card { 
+  display: flex; gap: 16px; padding: 20px; background: #fff; border: 1px solid var(--border); 
+  border-radius: 16px; font-size: 14px; color: var(--text-muted);
 }
+.task-check { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
 
-/* Questions Grid */
-.questions-grid { display: flex; flex-direction: column; gap: 12px; }
-.question-row { 
-  display: flex; gap: 16px; padding: 16px; border: 1px solid var(--bg-subtle); 
-  border-radius: 16px; transition: border-color 0.2s;
-}
-.question-row:hover { border-color: var(--border); background: var(--bg-subtle); }
-.q-number { font-size: 14px; font-weight: 800; color: var(--text-dim); }
-.q-text { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.q-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+/* ── ANALYSIS TAB ── */
+.analysis-rich-view { font-size: 16px; color: var(--text-muted); line-height: 1.8; }
+.analysis-rich-view h1, .analysis-rich-view h2 { font-size: 22px; font-weight: 800; color: var(--text); margin: 32px 0 16px; }
+.analysis-rich-view p { margin-bottom: 20px; }
+.analysis-rich-view ul { margin-bottom: 24px; padding-left: 24px; }
+.analysis-rich-view li { margin-bottom: 12px; }
 
-/* Plan Timeline */
-.plan-timeline { display: flex; flex-direction: column; gap: 24px; }
-.plan-week-box { position: relative; padding-left: 20px; border-left: 2px solid var(--accent-soft); }
-.week-label { font-weight: 700; font-size: 14px; margin-bottom: 12px; color: var(--accent); }
-.week-tasks { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.week-tasks li { font-size: 13px; color: var(--text-muted); position: relative; padding-left: 16px; }
-.week-tasks li::before { 
-  content: "•"; position: absolute; left: 0; color: var(--text-dim); 
-}
+/* ─── ANALYSIS TAB / BRIEFING ─── */
+.briefing-grid { display: grid; gap: 24px; }
+.brief-card { padding: 32px; border: 1px solid var(--border); border-radius: 24px; background: #fff; border-left-width: 6px; }
+.brief-card.insight { border-left-color: var(--accent); }
+.brief-card.warning { border-left-color: #f59e0b; background: #fffbeb; }
+.brief-card.strategy { border-left-color: #10b981; }
 
-/* Analysis Markdown */
-.analysis-markdown { font-size: 15px; color: var(--text-muted); }
-.analysis-markdown h1, .analysis-markdown h2 { font-size: 18px; color: var(--text); margin: 24px 0 12px; }
-.analysis-markdown p { margin-bottom: 16px; }
-.analysis-markdown li { margin-bottom: 8px; }
+.brief-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.brief-type-icon { font-size: 20px; }
+.brief-title { font-size: 18px; font-weight: 800; color: var(--text); }
 
-/* Mobile Adaptations */
+.brief-points { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.brief-point { display: flex; gap: 12px; font-size: 15px; color: var(--text-muted); line-height: 1.6; }
+.brief-dot { width: 6px; height: 6px; background: var(--text-dim); border-radius: 50%; margin-top: 10px; flex-shrink: 0; }
+.brief-card.insight .brief-dot { background: var(--accent); }
+.brief-card.warning .brief-dot { background: #f59e0b; }
+.brief-card.strategy .brief-dot { background: #10b981; }
+
+/* ── LOADING ── */
+.loading-container { text-align: center; padding: 120px 24px; }
+.loading-spinner { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--accent); border-radius: 50%; margin: 0 auto 32px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 @media (max-width: 1024px) {
-  .bento-difficulty, .bento-insights, .bento-rounds, .bento-topics, .bento-questions, .bento-plan { grid-column: span 12; }
-  .form-grid { grid-template-columns: 1fr; }
-  .hero-heading { font-size: 40px; }
+  .results-container { flex-direction: column; }
+  .results-sidebar { width: 100%; height: auto; position: static; padding: 24px; border-right: none; border-bottom: 1px solid var(--border); }
+  .sidebar-nav { flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
+  .week-tasks-grid { grid-template-columns: 1fr; }
+  .overview-grid { grid-template-columns: 1fr; }
+  .overview-card.full-width { grid-column: span 1; }
 }
 `;
