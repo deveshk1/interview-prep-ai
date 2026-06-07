@@ -20,6 +20,13 @@ function ResultsPanel({ guide, company, role, experience, onReset }) {
   const data = parseGuide(guide);
   const [activeTab, setActiveTab] = useState("overview");
   const [expandedQuestion, setExpandedQuestion] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  useEffect(() => {
+    if (data?.topQuestions?.length > 0 && !selectedCategory) {
+      setSelectedCategory(data.topQuestions[0].category || "General");
+    }
+  }, [data, selectedCategory]);
 
   if (!data || !data.difficultyScore) {
     return (
@@ -135,66 +142,71 @@ function ResultsPanel({ guide, company, role, experience, onReset }) {
           )}
 
           {activeTab === "questions" && (
-            <section className="doc-section">
+            <section className="doc-section questions-section">
               <span className="section-eyebrow">Technical Inventory</span>
               <h2 className="doc-title">Premium Question Bank</h2>
-              <p className="doc-lead">Mined from real-world patterns for {role}. Grouped by core evaluation pillars.</p>
+              <p className="doc-lead">Mined from real-world patterns for {role}. Select a pillar to dive deep.</p>
               
-              <div className="topic-wise-questions">
-                {Object.entries(
+              <div className="q-filter-bar">
+                {Object.keys(
                   (data.topQuestions || []).reduce((acc, q) => {
                     const cat = q.category || "General";
                     if (!acc[cat]) acc[cat] = [];
                     acc[cat].push(q);
                     return acc;
                   }, {})
-                ).map(([category, questions], groupIdx) => (
-                  <div key={groupIdx} className="q-topic-group">
-                    <h3 className="q-topic-header">
-                      <span className="q-topic-dot" />
-                      {category}
-                      <span className="q-topic-count">{questions.length} Questions</span>
-                    </h3>
-                    
-                    <div className="questions-list">
-                      {questions.map((q, i) => {
-                        const globalIdx = (data.topQuestions || []).indexOf(q);
-                        return (
-                          <div 
-                            key={globalIdx} 
-                            className={`q-row ${expandedQuestion === globalIdx ? "is-expanded" : ""}`}
-                            onClick={() => setExpandedQuestion(expandedQuestion === globalIdx ? null : globalIdx)}
-                          >
-                            <div className="q-row-main">
-                              <div className="q-row-id">Q{globalIdx + 1}</div>
-                              <div className="q-row-text">{q.question}</div>
-                              <div className="q-toggle-icon">{expandedQuestion === globalIdx ? "−" : "+"}</div>
-                            </div>
-                            
-                            {expandedQuestion === globalIdx && (
-                              <div className="q-row-expanded fade-in">
-                                <div className="q-coach-insight">
-                                  <div className="insight-row">
-                                    <span className="insight-label">SIGNAL:</span>
-                                    <span className="insight-value">{q.whyAsk}</span>
-                                  </div>
-                                  <div className="insight-row">
-                                    <span className="insight-label">KEY CONCEPTS:</span>
-                                    <div className="key-concepts">
-                                      {(q.keyPoints || []).map((kp, j) => (
-                                        <span key={j} className="concept-pill">{kp}</span>
-                                      ))}
-                                    </div>
-                                  </div>
+                ).map((cat) => (
+                  <button 
+                    key={cat}
+                    className={`q-filter-btn ${selectedCategory === cat ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setExpandedQuestion(null);
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="topic-wise-questions">
+                {(data.topQuestions || [])
+                  .filter(q => (q.category || "General") === selectedCategory)
+                  .map((q, i) => {
+                    const globalIdx = (data.topQuestions || []).indexOf(q);
+                    return (
+                      <div 
+                        key={globalIdx} 
+                        className={`q-row ${expandedQuestion === globalIdx ? "is-expanded" : ""}`}
+                        onClick={() => setExpandedQuestion(expandedQuestion === globalIdx ? null : globalIdx)}
+                      >
+                        <div className="q-row-main">
+                          <div className="q-row-id">Q{globalIdx + 1}</div>
+                          <div className="q-row-text">{q.question}</div>
+                          <div className="q-toggle-icon">{expandedQuestion === globalIdx ? "−" : "+"}</div>
+                        </div>
+                        
+                        {expandedQuestion === globalIdx && (
+                          <div className="q-row-expanded fade-in">
+                            <div className="q-coach-insight">
+                              <div className="insight-row">
+                                <span className="insight-label">SIGNAL:</span>
+                                <span className="insight-value">{q.whyAsk}</span>
+                              </div>
+                              <div className="insight-row">
+                                <span className="insight-label">KEY CONCEPTS:</span>
+                                <div className="key-concepts">
+                                  {(q.keyPoints || []).map((kp, j) => (
+                                    <span key={j} className="concept-pill">{kp}</span>
+                                  ))}
                                 </div>
                               </div>
-                            )}
+                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </section>
           )}
@@ -356,7 +368,7 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 .user-area { font-size: 13px; font-weight: 600; color: #9ca3af; }
 .user-area button { background: none; border: none; font-family: inherit; font-weight: 700; cursor: pointer; color: #6b7280; }
 
-.hero { max-width: 800px; margin: 0 auto; text-align: center; }
+.hero {   width: 100%; margin: 0 auto; text-align: center; }
 .hero-title { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 24px; line-height: 1.1; color: #000000 !important; }
 .hero-title span { color: #2563eb; }
 .hero-sub { font-size: 18px; color: #374151 !important; margin-bottom: 64px; }
@@ -389,10 +401,28 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 .cta-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
 /* ── DASHBOARD ARCH ── */
-.dashboard-root { display: flex; flex: 1; width: 100%; background: #fff; }
+.dashboard-root {
+  display: flex;
+  width: 100vw;
+  min-height: 100vh;
+  background: #fff;
+}
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  width: 100vw;
+  min-height: 100vh;
+}
 
 .sidebar { 
-  width: 260px; background: #fafafa; border-right: 1px solid #eeeeee; 
+   width: 220px; background: #fafafa; border-right: 1px solid #eeeeee; 
   padding: 40px 24px; display: flex; flex-direction: column; 
   position: sticky; top: 0; height: 100vh; flex-shrink: 0;
 }
@@ -418,14 +448,39 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 .new-btn:hover { background: #333; }
 
 /* ── CONTENT AREA ── */
-.content-area { flex: 1; overflow-y: auto; background: #fff; }
-.view-wrapper { max-width: 1100px; padding: 60px 80px; margin: 0; }
+.content-area {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+  width: 100%;
+}
+.view-wrapper {
+  width: 100%;
+  max-width: 100%;
+  padding: 30px 40px;
+}
 
 .doc-section { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
 .section-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #2563eb; margin-bottom: 8px; }
-.doc-title { font-size: 40px; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 20px; line-height: 1; color: #000; }
-.doc-lead { font-size: 17px; color: #4b5563; font-weight: 500; line-height: 1.6; max-width: 750px; text-align: left; margin-bottom: 48px; }
+.doc-title { font-size: 40px; font-weight: 700; letter-spacing: -0.05em; margin-bottom: 20px; line-height: 1; color: #000; }
+.doc-lead {
+  font-size: 17px;
+  color: #4b5563;
+  font-weight: 500;
+  line-height: 1.6;
+  max-width: 1200px;
+  text-align: left;
+  margin-bottom: 48px;
+}
+.questions-section {
+  width: 100%;
+  max-width: none;
+}
 
+.topic-wise-questions {
+  width: 100%;
+  max-width: none;
+}
 /* OVERVIEW */
 .score-hero { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; }
 .score-big { font-size: 64px; font-weight: 800; letter-spacing: -0.05em; color: #000; }
@@ -469,31 +524,37 @@ body { background: #ffffff; color: #000000; font-family: 'Plus Jakarta Sans', sa
 .task-text { font-size: 14px; font-weight: 600; color: #374151; line-height: 1.5; }
 
 /* QUESTIONS */
-.topic-wise-questions { width: 100%; display: flex; flex-direction: column; gap: 48px; }
-.q-topic-group { width: 100%; }
-.q-topic-header { 
-  display: flex; align-items: center; gap: 12px; 
-  font-size: 16px; font-weight: 800; color: #000; 
-  margin-bottom: 16px; padding-bottom: 12px; 
-  border-bottom: 2px solid #000; 
+.q-filter-bar { display: flex; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+.q-filter-btn { 
+  padding: 8px 16px; border: 1px solid #eeeeee; background: #fff; 
+  border-radius: 20px; font-family: inherit; font-size: 12px; font-weight: 500; 
+  color: #6b7280; cursor: pointer; transition: all 0.2s; 
 }
-.q-topic-dot { width: 6px; height: 6px; background: #2563eb; border-radius: 50%; }
-.q-topic-count { margin-left: auto; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #9ca3af; letter-spacing: 0.05em; }
+.q-filter-btn:hover { border-color: #000; color: #000; }
+.q-filter-btn.active { background: #000; border-color: #000; color: #fff; }
+
+.topic-wise-questions { width: 100%; display: flex; flex-direction: column; }
 
 .questions-list { display: flex; flex-direction: column; width: 100%; }
 .q-row { border-bottom: 1px solid #eeeeee; transition: background 0.1s; }
 .q-row:hover { background: #f9fafb; }
 .q-row.is-expanded { background: #fff; border-left: 4px solid #000; }
 
-.q-row-main { 
-  display: grid; 
-  grid-template-columns: 60px 1fr 180px 40px; 
-  padding: 24px 0; 
-  align-items: center; 
-  gap: 20px; 
+.q-row-main {
+  display: grid;
+  grid-template-columns: 80px minmax(0,1fr) 60px;
+  padding: 28px 0;
+  align-items: center;
+  gap: 24px;
 }
-.q-row-id { font-size: 11px; font-weight: 800; color: #9ca3af; font-family: monospace; }
-.q-row-text { font-size: 16px; font-weight: 700; color: #000; line-height: 1.4; padding-right: 20px; }
+.q-row-id {  font-size: 10px;
+  font-weight: 600;
+  color: #cbd5e1; font-family: monospace; }
+.q-row-text { font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.7;
+  padding-right: 20px; color: #000; line-height: 1.4; padding-right: 20px; }
 .q-row-meta { display: flex; justify-content: flex-end; }
 .q-category-pill { font-size: 10px; font-weight: 800; text-transform: uppercase; background: #f3f4f6; color: #4b5563; padding: 4px 10px; border-radius: 4px; white-space: nowrap; }
 .q-toggle-icon { font-size: 20px; color: #9ca3af; text-align: center; cursor: pointer; }
